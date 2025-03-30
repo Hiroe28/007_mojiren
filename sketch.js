@@ -89,6 +89,9 @@ function setup() {
   state.pixelDensity = pixelDensity();
   console.log(`デバイスピクセル比: ${state.pixelDensity}`);
   
+  // 結果表示エリアのセットアップ
+  setupResultDisplay();
+  
   // 結果表示要素を初期化
   clearResultDisplay();
   
@@ -115,6 +118,7 @@ function setup() {
     updateDisplayChar();
   }, 200); // 200ミリ秒後に実行 
 }
+
 
 // 結果表示をクリアする関数
 function clearResultDisplay() {
@@ -815,12 +819,12 @@ function calculateFriendlyScore() {
   
   console.log(`判定前の生スコア - 精度:${accuracyScore.toFixed(1)}, カバー:${coverageScore.toFixed(1)}, キーポイント:${keyPointsScore.toFixed(1)}`);
   
-  // モバイル環境では判定を適切に調整（過剰な加点はしない）
+  // モバイル環境では判定を適切に調整
   if (isMobileDevice()) {
-    // モバイルでは判定を緩和するがランク分けを保持
-    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 20%増加
-    coverageScore = Math.min(100, coverageScore * 1.2);  // 20%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.2); // 20%増加
+    // モバイルでは判定を大きく緩和
+    accuracyScore = Math.min(100, accuracyScore * 1.5);  // 50%増加
+    coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
   }
   
   // カテゴリ別の判定調整
@@ -845,7 +849,7 @@ function calculateFriendlyScore() {
   
   // モバイル環境でも過剰な加点はしない
   if (isMobileDevice()) {
-    finalScore = Math.min(100, finalScore + 10); // 加点を10に制限
+    finalScore = Math.min(100, finalScore + 15); // 加点を10→15に増加
   }
   
   console.log(`最終スコア: ${finalScore}`);
@@ -889,16 +893,23 @@ function showFriendlyFeedback() {
     resultDisplay.innerHTML = `${emoji}<br>${message}`;
     resultDisplay.style.color = color;
     resultDisplay.style.fontWeight = 'bold';
+    resultDisplay.style.display = 'block'; // 表示設定を追加
     
     // アニメーション効果を追加
     resultDisplay.classList.remove('pop-in');
     void resultDisplay.offsetWidth; // リフロー（アニメーションをリセット）
     resultDisplay.classList.add('pop-in');
     
-    // スクロールして結果を表示
+    // タイムアウトを長めに設定
     setTimeout(() => {
-      resultDisplay.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+      // スムーズスクロールを試みる（サポートされていない環境では単純なジャンプになる）
+      try {
+        resultDisplay.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch(e) {
+        // 失敗した場合は通常のスクロール
+        window.scrollTo(0, resultDisplay.offsetTop - 100);
+      }
+    }, 300);
   }
   
   // Canvas内にも簡易的に表示（バックアップとして）
@@ -1005,6 +1016,7 @@ function executeJudgement() {
   if (resultDisplay) {
     resultDisplay.innerHTML = '判定中...';
     resultDisplay.style.color = '#666';
+    resultDisplay.style.display = 'block'; // 表示設定
   }
   
   // 文字テンプレートの更新確認
@@ -1073,37 +1085,56 @@ function touchStarted() {
   // キャンバスの位置を更新（タッチのたびに更新して位置ずれに対応）
   updateCanvasPosition();
   
-  if (!isMouseInsideCanvas()) return;
-  
   if (touches.length > 0) {
-    state.isDrawing = true;
-    state.userStrokes.push([]);
+    const touchX = touches[0].x;
+    const touchY = touches[0].y;
     
-    // キャンバス内のタッチのみpreventDefault
-    // これは描画のスクロール防止のためだけに使用
-    return false;
+    // キャンバスの位置情報があれば、それを使って判定
+    if (state.canvasRect) {
+      const relativeX = touchX - state.canvasRect.left;
+      const relativeY = touchY - state.canvasRect.top;
+      
+      if (state.debugMode) {
+        console.log(`タッチ開始: raw=(${touchX}, ${touchY}), 変換後=(${relativeX}, ${relativeY})`);
+      }
+      
+      if (relativeX >= 0 && relativeX <= state.canvasRect.width && 
+          relativeY >= 0 && relativeY <= state.canvasRect.height) {
+        state.isDrawing = true;
+        state.userStrokes.push([]);
+        return false; // キャンバス内のタッチのみpreventDefault
+      }
+    } else {
+      // キャンバス位置情報がなければ従来の判定を使用
+      if (isMouseInsideCanvas()) {
+        state.isDrawing = true;
+        state.userStrokes.push([]);
+        return false;
+      }
+    }
   }
 }
 
+
 // タッチ移動 - p5.jsのタッチイベント 
 function touchMoved() {
-  if (!state.isDrawing || !isMouseInsideCanvas()) return;
+  if (!state.isDrawing) return;
   
   if (touches.length > 0) {
     let currentStroke = state.userStrokes[state.userStrokes.length - 1];
     
-    // p5.jsのtouchX, touchYを使用（より正確な座標変換が行われる）
+    // p5.jsのtouchX, touchYを使用
     let touchX = touches[0].x;
     let touchY = touches[0].y;
     
     // モバイルでのキャンバス内座標に変換
     if (state.canvasRect) {
       // キャンバスの位置を考慮した相対座標に変換
-      const relativeX = touchX;
-      const relativeY = touchY;
+      const relativeX = touchX - state.canvasRect.left;
+      const relativeY = touchY - state.canvasRect.top;
       
       if (state.debugMode) {
-        console.log(`タッチ座標: raw=(${touches[0].x}, ${touches[0].y}), 変換後=(${relativeX}, ${relativeY})`);
+        console.log(`タッチ移動: raw=(${touchX}, ${touchY}), 変換後=(${relativeX}, ${relativeY})`);
       }
       
       touchX = relativeX;
@@ -1135,6 +1166,7 @@ function touchMoved() {
     return false;
   }
 }
+
 
 // タッチエンド - p5.jsのタッチイベント
 function touchEnded() {
@@ -1403,4 +1435,28 @@ function windowResized() {
   createUI();
   
   updateDisplayChar();
+}
+
+// 結果表示要素のセットアップ - setup()関数内で呼び出される
+function setupResultDisplay() {
+  // 既存の要素を確認
+  let resultDisplay = document.getElementById('result-display');
+  
+  // なければ新規作成
+  if (!resultDisplay) {
+    resultDisplay = document.createElement('div');
+    resultDisplay.id = 'result-display';
+    // sketch-holderの後に配置
+    const sketchHolder = document.getElementById('sketch-holder');
+    if (sketchHolder && sketchHolder.parentNode) {
+      sketchHolder.parentNode.insertBefore(resultDisplay, sketchHolder.nextSibling);
+    } else {
+      // 代替位置
+      document.querySelector('.container').appendChild(resultDisplay);
+    }
+  }
+  
+  // 初期状態では非表示
+  resultDisplay.style.display = 'none';
+  console.log('結果表示エリアをセットアップしました');
 }

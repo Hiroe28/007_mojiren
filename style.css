@@ -249,7 +249,7 @@ canvas {
       margin-top: 5px;
       flex-direction: column;
       gap: 5px;
-      position: fixed;
+      position: sticky; /* fixedからstickyに変更 */
       bottom: 0;
       left: 0;
       right: 0;
@@ -269,7 +269,7 @@ canvas {
   }
   
   #sketch-holder {
-      margin-bottom: 110px;
+      margin-bottom: 20px; /* 調整 */
   }
 }
 
@@ -330,6 +330,15 @@ button:active, .char-btn:active, .category-btn:active, .control-btn:active {
 
 .pop-in {
   animation: pop 0.5s ease-out;
+}
+
+/* モバイル用結果表示領域の調整 */
+@media (max-width: 768px) {
+  #result-display {
+    margin-bottom: 120px; /* コントロールパネルの高さ分余白を確保 */
+    font-size: 20px; /* フォントサイズを少し小さく */
+    padding: 10px;
+  }
 }
 
 /* モバイル用下部の余白 */
