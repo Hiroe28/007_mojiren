@@ -53,6 +53,38 @@ document.addEventListener('DOMContentLoaded', function() {
     if (isTouchDevice()) {
         console.log('タッチデバイスを検出 - スペシャルモードを有効化');
         
+        // iOS SafariでのWeb Audio APIと音声合成APIの初期化
+        function setupAudioContext() {
+            // AudioContextの初期化
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) {
+                const audioCtx = new AudioContext();
+                // 無音を再生して初期化
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.value = 0; // 無音
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start(0);
+                oscillator.stop(0.001);
+                console.log('AudioContext初期化完了');
+            }
+            
+            // 音声合成APIの初期化
+            if ('speechSynthesis' in window) {
+                // 無音発声で初期化
+                const utterance = new SpeechSynthesisUtterance('');
+                utterance.volume = 0; // 無音
+                window.speechSynthesis.speak(utterance);
+                console.log('SpeechSynthesis初期化完了');
+            }
+        }
+        
+        // ユーザー操作時に音声機能を初期化
+        document.addEventListener('touchstart', function() {
+            setupAudioContext();
+        }, { once: true });
+        
         // タッチ開始時のハンドラ
         document.addEventListener('touchstart', function(e) {
             // キャンバス内のタッチは既に処理されるので、ここでは何もしない
@@ -63,6 +95,22 @@ document.addEventListener('DOMContentLoaded', function() {
         document.addEventListener('dblclick', function(e) {
             e.preventDefault();
         }, { passive: false });
+        
+        // よみあげボタンの特別処理
+        document.addEventListener('click', function(e) {
+            const target = e.target.closest('#speak-button');
+            if (target) {
+                console.log('よみあげボタンが押されました (click経由)');
+                const currentChar = document.querySelector('.char-btn.active')?.textContent || '';
+                if (currentChar) {
+                    setTimeout(function() {
+                        if (window.speakText) {
+                            window.speakText(currentChar);
+                        }
+                    }, 10);
+                }
+            }
+        }, false);
     }
 });
 </script>

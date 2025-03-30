@@ -391,17 +391,23 @@ function createControlPanel() {
   
   buttonContainer.appendChild(saveButton);
   
-  // 読み上げボタン
+  // 読み上げボタン - モバイルでの問題修正
   const speakButton = document.createElement('button');
   speakButton.className = 'control-btn';
+  speakButton.id = 'speak-button'; // IDを追加
   speakButton.innerHTML = '🔊 よみあげ';
   
   if (isTouchDevice()) {
+    // モバイル用のイベントハンドラ強化
     speakButton.addEventListener('touchstart', function(event) {
+      event.stopPropagation(); // イベントの伝播を止める
       console.log('読み上げボタンタッチ');
-      speakText(`${state.currentChar}`);
-      // イベントの伝播を止めない (preventDefault不使用)
-    });
+      
+      // iOSの制約対策: ユーザージェスチャ内で音声合成APIを呼び出す
+      setTimeout(function() {
+        speakText(`${state.currentChar}`);
+      }, 10);
+    }, { passive: false });
   } else {
     speakButton.addEventListener('click', function(event) {
       event.preventDefault();
@@ -782,54 +788,54 @@ function calculateFriendlyScore() {
   let coverageScore = calculateCoverage(); // 文字全体をなぞれたか
   let keyPointsScore = checkKeyPointsCoverage(); // 重要ポイントをなぞれたか
   
-  // モバイル環境での判定を優しくする調整
+  console.log(`判定前の生スコア - 精度:${accuracyScore}, カバー:${coverageScore}, キーポイント:${keyPointsScore}`);
+  
+  // モバイル環境ではベースの点数を大幅に引き上げる
   if (isMobileDevice()) {
-    // モバイル環境では基本点に加点（タッチしにくいための配慮）
-    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 精度スコアを20%増加
-    coverageScore = Math.min(100, coverageScore * 1.3);  // カバレッジスコアを30%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.4); // キーポイントスコアを40%増加
+    // 最低保証スコア（頑張って書いたらこれ以上の点数になる）
+    accuracyScore = Math.max(accuracyScore, 50);
+    coverageScore = Math.max(coverageScore, 50);
+    keyPointsScore = Math.max(keyPointsScore, 50);
+    
+    // さらにボーナス加算
+    accuracyScore = Math.min(100, accuracyScore * 1.3);
+    coverageScore = Math.min(100, coverageScore * 1.4);
+    keyPointsScore = Math.min(100, keyPointsScore * 1.5);
   }
   
   // カテゴリ別の判定調整
   if (state.currentCategory === 'numbers') {
-    // 数字の場合は重要ポイント判定を優先
-    keyPointsScore = Math.min(100, keyPointsScore * 1.3); // キーポイントスコアをさらに増強
+    // 数字は特に簡単に書けるように
+    keyPointsScore = Math.min(100, keyPointsScore * 1.2);
     
     // 数字の場合はカバレッジ要求を下げる
-    if (keyPointsScore >= 60) {
-      coverageScore = Math.max(coverageScore, 60); // キーポイントが良ければカバレッジも最低60%保証
+    if (keyPointsScore >= 50) {
+      coverageScore = Math.max(coverageScore, 70);
     }
     
     // 配分も調整（キーポイントの比重を上げる）
-    return Math.floor(
+    return Math.max(70, Math.floor(
       accuracyScore * 0.2 + 
       coverageScore * 0.3 + 
       keyPointsScore * 0.5
-    );
-  }
-  
-  // ひらがな・カタカナは通常の判定だが、閾値を下げる
-  // 最低限のカバレッジ要件を緩和（15%に下げる）
-  if (coverageScore < 15 && keyPointsScore < 25) {
-    return Math.min(40, Math.floor(
-      accuracyScore * 0.3 + 
-      coverageScore * 0.3 + 
-      keyPointsScore * 0.4
     ));
   }
   
-  // 重要ポイントのカバレッジを重視する配分
+  // ひらがな・カタカナも簡単に
   let finalScore = Math.floor(
     accuracyScore * 0.25 + 
-    coverageScore * 0.35 + 
-    keyPointsScore * 0.4
+    coverageScore * 0.3 + 
+    keyPointsScore * 0.45
   );
   
-  // モバイル環境では少し加点して子供が喜ぶように調整
+  // モバイル環境では大幅加点
   if (isMobileDevice()) {
-    finalScore = Math.min(100, finalScore + 10);
+    finalScore = Math.min(100, finalScore + 20);
+    // モバイルの場合は最低スコアを設定
+    finalScore = Math.max(finalScore, 60);
   }
   
+  console.log(`最終スコア: ${finalScore}`);
   return finalScore;
 }
 
@@ -841,12 +847,13 @@ function showFriendlyFeedback() {
   // 評価のレベルに応じた設定（閾値を調整）
   let emoji, message, color;
   
-  if (state.accuracy >= 70) { // 閾値を80→70に下げる
+  // 判定閾値を下げる（モバイルで常に⭐になる問題を解決）
+  if (state.accuracy >= 60) { // 70→60に閾値を下げる
     emoji = '⭐⭐⭐';
     message = 'すごい！';
     color = '#4CAF50'; // 緑
     playSuccessSound();
-  } else if (state.accuracy >= 40) { // 閾値を50→40に下げる
+  } else if (state.accuracy >= 30) { // 40→30に閾値を下げる
     emoji = '⭐⭐';
     message = 'がんばったね！';
     color = '#FFC107'; // 黄色
@@ -873,9 +880,9 @@ function showFriendlyFeedback() {
   let yPosEmoji, yPosMessage;
   
   if (isMobileDevice()) {
-    // モバイル用表示位置 - 文字の下に表示
-    yPosEmoji = height * 0.65;
-    yPosMessage = height * 0.75;
+    // モバイル用表示位置 - もっと下に表示
+    yPosEmoji = height * 0.75;  // 0.65→0.75へ移動
+    yPosMessage = height * 0.85; // 0.75→0.85へ移動
     
     textSize(36);
     fill(color);
@@ -1099,55 +1106,90 @@ function isMouseInsideCanvas() {
 // 音声読み上げ機能
 function speakText(text) {
   if ('speechSynthesis' in window) {
+    // iOS Safariでの読み上げ問題対策
+    window.speechSynthesis.cancel(); // 既存の読み上げをキャンセル
+    
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ja-JP';
     
-    // 音声を取得（日本語の女性の声があれば選択）
-    let voices = speechSynthesis.getVoices();
+    console.log('読み上げリクエスト: ' + text);
     
-    // 音声が読み込めていない場合は少し待ってから再取得
+    // 音声を取得（日本語の女性の声があれば選択）
+    let voices = window.speechSynthesis.getVoices();
+    
+    // iOS/Safariでの音声取得問題対策
     if (voices.length === 0) {
-      // 非同期で音声を読み込む
-      speechSynthesis.onvoiceschanged = () => {
-        voices = speechSynthesis.getVoices();
-        setVoice();
-      };
+      // 音声が読み込めていない場合はタイマーを使って再試行
+      setTimeout(function() {
+        voices = window.speechSynthesis.getVoices();
+        console.log(`利用可能な音声: ${voices.length}個`);
+        setVoiceAndSpeak();
+      }, 1000);
     } else {
-      setVoice();
+      setVoiceAndSpeak();
     }
     
-    function setVoice() {
+    function setVoiceAndSpeak() {
+      // 利用可能な音声をログ出力
+      if (voices.length > 0) {
+        console.log('利用可能な音声:');
+        voices.forEach((voice, index) => {
+          console.log(`${index}: ${voice.name} (${voice.lang})`);
+        });
+      }
+      
       // 優先順位で声を探す
       let selectedVoice = null;
       
       // 1. 日本語の子供向け音声があれば最優先
       selectedVoice = voices.find(voice => 
-        voice.lang === 'ja-JP' && (voice.name.includes('Child') || voice.name.includes('子供')));
+        voice.lang.includes('ja') && (voice.name.includes('Child') || voice.name.includes('子供')));
       
       // 2. 日本語の女性音声
       if (!selectedVoice) {
         selectedVoice = voices.find(voice => 
-          voice.lang === 'ja-JP' && (voice.name.includes('Female') || voice.name.includes('女性')));
+          voice.lang.includes('ja') && (voice.name.includes('Female') || voice.name.includes('女性')));
       }
       
       // 3. どれでも日本語音声
       if (!selectedVoice) {
-        selectedVoice = voices.find(voice => voice.lang === 'ja-JP');
+        selectedVoice = voices.find(voice => voice.lang.includes('ja'));
+      }
+      
+      // 4. どの音声でも
+      if (!selectedVoice && voices.length > 0) {
+        selectedVoice = voices[0];
       }
       
       if (selectedVoice) {
         utterance.voice = selectedVoice;
         console.log(`選択された音声: ${selectedVoice.name}`);
       }
+      
+      // 「ゆっくり解説」風の設定
+      utterance.rate = 0.7;  // 少しゆっくり (0.5→0.7)
+      utterance.pitch = 1.2; // 高めのピッチ (1.5→1.2)
+      utterance.volume = 1.0; // 最大音量
+      
+      try {
+        window.speechSynthesis.speak(utterance);
+        console.log('読み上げ開始');
+        
+        // モバイルでの問題対策: 読み上げ中に画面が切り替わるのを防ぐ
+        utterance.onend = function() {
+          console.log('読み上げ完了');
+        };
+        
+        utterance.onerror = function(event) {
+          console.error('読み上げエラー:', event);
+        };
+      } catch (e) {
+        console.error('音声合成エラー:', e);
+      }
     }
-    
-    // 「ゆっくり解説」風の設定
-    utterance.rate = 0.5;  // かなりゆっくり
-    utterance.pitch = 1.5; // 高めのピッチ（まりさ・霊夢風）
-    
-    speechSynthesis.speak(utterance);
   } else {
     console.log('お使いのブラウザは音声合成に対応していません');
+    alert('お使いのブラウザは音声合成に対応していません');
   }
 }
 
