@@ -308,26 +308,39 @@ button:active, .char-btn:active, .category-btn:active, .control-btn:active {
   }
 }
 
-
-/* 結果表示エリア - オーバーレイ方式に変更 */
+/* 結果表示エリア - オーバーレイの安定化 */
 #result-display {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(255, 255, 255, 0.85);
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background-color: rgba(255, 255, 255, 0.9);
   border-radius: 15px;
   text-align: center;
-  font-size: 28px;
   padding: 20px;
   width: 80%;
   max-width: 300px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
-  pointer-events: none; /* 下のキャンバスへのイベントを透過させる */
   opacity: 0;
   transition: opacity 0.3s ease;
-  border: 3px solid #ffb347; /* 柔らかい印象のボーダー */
+  border: 3px solid #ffb347;
+  pointer-events: none;
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+}
+
+/* スケッチホルダーを必ず相対位置に */
+#sketch-holder {
+  position: relative !important;
+  overflow: visible !important; /* オーバーレイがはみ出ても大丈夫なように */
+}
+
+/* アニメーションの最適化 */
+.pop-in {
+  animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: center center;
+  will-change: transform;
 }
 
 #result-display.active {
