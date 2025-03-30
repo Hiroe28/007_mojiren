@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#ff6b6b">
     <title>ひらがな・カタカナ・数字なぞり練習アプリ</title>
     
     <!-- p5.jsライブラリを読み込み -->
@@ -23,7 +24,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>ひらがな・カタカナ・すうじ なぞりれんしゅう</h1>
+        <h1>ひらがな・カタカナ・すうじ<br>なぞりれんしゅう</h1>
         
         <!-- カテゴリと文字選択はJavaScriptで動的に生成 -->
         <div id="category-buttons"></div>
@@ -39,6 +40,12 @@
     </div>
     
     <!-- メインのスクリプト -->
-    <script src="sketch.js"></script>
+    <script>
+// イベントの伝播を確実に行うために追加
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM完全ロード済み');
+});
+</script>
+<script src="sketch.js"></script>
 </body>
 </html>

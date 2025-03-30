@@ -17,8 +17,9 @@ body {
 h1 {
   color: #ff6b6b;
   text-align: center;
-  margin-bottom: 15px;
-  font-size: 24px;
+  margin-bottom: 10px;
+  font-size: 22px;
+  line-height: 1.2;
 }
 
 /* カテゴリボタン */
@@ -176,47 +177,79 @@ canvas {
 /* レスポンシブデザイン */
 @media (max-width: 480px) {
   body {
-      padding: 10px;
+      padding: 5px;
+  }
+  
+  .container {
+      padding: 0;
   }
   
   h1 {
-      font-size: 20px;
-      margin-bottom: 10px;
+      font-size: 18px;
+      margin-bottom: 5px;
+      padding: 0 5px;
   }
   
   .category-btn {
-      padding: 6px 12px;
+      padding: 5px 10px;
       font-size: 14px;
+      margin-bottom: 5px;
+  }
+  
+  #category-buttons {
+      margin-bottom: 5px;
+      gap: 5px;
   }
   
   #char-buttons {
-      max-height: 80px;
-      margin-bottom: 10px;
+      max-height: 70px;
+      margin-bottom: 5px;
+      padding: 5px;
   }
   
   .char-btn {
-      width: 32px;
-      height: 32px;
-      font-size: 16px;
+      width: 30px;
+      height: 30px;
+      font-size: 15px;
+      margin: 1px;
   }
   
   .control-btn {
-      padding: 6px 12px;
+      padding: 5px 10px;
       font-size: 13px;
+      min-width: 80px;
   }
   
   .color-option {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
+      margin: 0 2px;
   }
   
   #control-panel {
-      margin-top: 10px;
+      margin-top: 5px;
       flex-direction: column;
+      gap: 5px;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(255, 255, 255, 0.9);
+      padding: 5px;
+      z-index: 100;
+  }
+  
+  #color-picker-container {
+      margin-bottom: 2px;
   }
   
   #button-container {
       width: 100%;
+      gap: 4px;
+  }
+  
+  #sketch-holder {
+      margin-bottom: 110px;
   }
 }
 
@@ -230,23 +263,39 @@ body, button, input, textarea, select {
   touch-action: none;
 }
 
-/* スクロール防止 */
-html, body {
-  overscroll-behavior: none;
-  position: fixed;
-  overflow: hidden;
-  width: 100%;
-  height: 100%;
-}
+/* スクロール防止 - モバイルデバイスでのみ適用 */
+@media (max-width: 768px) {
+  html, body {
+      overscroll-behavior: none;
+      position: fixed;
+      overflow: hidden;
+      width: 100%;
+      height: 100%;
+  }
 
-/* 全体のスクロールを許可しながら、アプリ部分は固定 */
-body {
-  position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
+  body {
+      position: relative;
+      overflow-y: auto;
+      overflow-x: hidden;
+  }
 }
 
 /* iOS Safari のダブルタップズームを防止 */
 * {
   touch-action: manipulation;
+}
+
+/* 判定ボタンをモバイルデバイスで強調 */
+@media (max-width: 480px) {
+  #judge-button {
+      background-color: #ff5c5c !important;
+      font-weight: bold !important;
+      font-size: 15px !important;
+      padding: 8px 12px !important;
+  }
+  
+  /* 固定されたスクロールに対応 */
+  .container {
+      padding-bottom: 120px;
+  }
 }

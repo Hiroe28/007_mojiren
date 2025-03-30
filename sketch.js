@@ -52,9 +52,9 @@ function setup() {
   
   if (isMobileDevice()) {
     // モバイル用のサイズ設定
-    canvasWidth = min(windowWidth - 20, 500);
+    canvasWidth = min(windowWidth - 10, 400);
     // モバイルでは高さを小さくして、下部のボタンが見えるようにする
-    canvasHeight = min(windowHeight - 350, 400);
+    canvasHeight = min(windowHeight - 280, 320);
   } else {
     // PC用のサイズ設定（従来通り）
     canvasWidth = min(windowWidth - 40, 800);
@@ -114,19 +114,30 @@ function createCategoryButtons() {
     const button = document.createElement('button');
     button.className = `category-btn ${state.currentCategory === category.id ? 'active' : ''}`;
     button.textContent = category.label;
-    button.onclick = () => {
+    // デバッグ用にdata属性を追加
+    button.setAttribute('data-category', category.id);
+    
+    // クリックイベントハンドラをより確実に動作させるための修正
+    button.addEventListener('click', function(event) {
+      event.preventDefault();
+      console.log(`カテゴリ変更: ${category.id}`);
+      
       // 全てのカテゴリボタンからactiveクラスを削除
       document.querySelectorAll('.category-btn').forEach(btn => {
         btn.classList.remove('active');
       });
       // クリックされたボタンにactiveクラスを追加
-      button.classList.add('active');
+      this.classList.add('active');
       
+      // 状態を更新
       state.currentCategory = category.id;
       state.currentChar = characters[category.id][0];
+      
+      // UIと表示を更新
       createCharButtons();
       resetCanvas();
-    };
+    });
+    
     categoryDiv.appendChild(button);
   });
 }
@@ -136,30 +147,42 @@ function createCharButtons() {
   const charDiv = document.getElementById('char-buttons');
   charDiv.innerHTML = '';
   
-  // スマホの場合は文字選択エリアの高さを小さくする
+  // スマホの場合は文字選択エリアの高さをさらに小さくする
   if (isMobileDevice()) {
-    charDiv.style.maxHeight = '80px';
+    charDiv.style.maxHeight = '70px';
   } else {
     charDiv.style.maxHeight = '120px';
   }
+  
+  // 現在選択されているカテゴリを表示（デバッグ用）
+  console.log(`文字ボタン生成: カテゴリ=${state.currentCategory}, 文字数=${characters[state.currentCategory].length}`);
   
   characters[state.currentCategory].forEach(char => {
     const button = document.createElement('button');
     button.className = `char-btn ${state.currentChar === char ? 'active' : ''}`;
     button.textContent = char;
-    button.onclick = () => {
+    
+    // クリックイベントハンドラをより確実に動作させるための修正
+    button.addEventListener('click', function(event) {
+      event.preventDefault();
+      
       // 全ての文字ボタンからactiveクラスを削除
       document.querySelectorAll('.char-btn').forEach(btn => {
         btn.classList.remove('active');
       });
       // クリックされたボタンにactiveクラスを追加
-      button.classList.add('active');
+      this.classList.add('active');
       
+      // 状態を更新
       state.currentChar = char;
       resetCanvas();
-    };
+    });
+    
     charDiv.appendChild(button);
   });
+  
+  // スクロール位置をリセット
+  charDiv.scrollTop = 0;
 }
 
 // フォント選択ボタンを作成
@@ -194,11 +217,12 @@ function createControlPanel() {
   const controlPanel = document.getElementById('control-panel');
   controlPanel.innerHTML = '';
   
-  // スマホ用に2段組のレイアウトに変更
+  // スマホ用にレイアウトを変更
   if (isMobileDevice()) {
     controlPanel.style.flexDirection = 'column';
     controlPanel.style.alignItems = 'center';
-    controlPanel.style.gap = '10px';
+    controlPanel.style.gap = '5px';
+    controlPanel.style.padding = '5px';
   }
   
   // 色選択
@@ -209,56 +233,72 @@ function createControlPanel() {
     const colorOption = document.createElement('div');
     colorOption.className = `color-option ${state.strokeColor === color ? 'active' : ''}`;
     colorOption.style.backgroundColor = color;
-    colorOption.onclick = () => {
+    
+    // クリックイベントハンドラをより確実に動作させるための修正
+    colorOption.addEventListener('click', function(event) {
+      event.preventDefault();
+      
       // 全ての色オプションからactiveクラスを削除
       document.querySelectorAll('.color-option').forEach(option => {
         option.classList.remove('active');
       });
       // クリックされたオプションにactiveクラスを追加
-      colorOption.classList.add('active');
+      this.classList.add('active');
       
       state.strokeColor = color;
-    };
+    });
+    
     colorContainer.appendChild(colorOption);
   });
   controlPanel.appendChild(colorContainer);
   
-  // ボタンコンテナ作成（スマホの場合は2行に分けるため）
+  // ボタンコンテナ作成（スマホ用に最適化）
   const buttonContainer = document.createElement('div');
   buttonContainer.id = 'button-container';
   buttonContainer.style.display = 'flex';
   buttonContainer.style.flexWrap = 'wrap';
   buttonContainer.style.justifyContent = 'center';
-  buttonContainer.style.gap = '10px';
+  buttonContainer.style.gap = '5px';
+  buttonContainer.style.width = '100%';
   controlPanel.appendChild(buttonContainer);
   
   // リセットボタン
   const resetButton = document.createElement('button');
   resetButton.className = 'control-btn';
   resetButton.innerHTML = '🔄 リセット';
-  resetButton.onclick = resetCanvas;
+  resetButton.addEventListener('click', function(event) {
+    event.preventDefault();
+    resetCanvas();
+  });
   buttonContainer.appendChild(resetButton);
   
   // 保存ボタン
   const saveButton = document.createElement('button');
   saveButton.className = 'control-btn';
   saveButton.innerHTML = '💾 ほぞん';
-  saveButton.onclick = () => {
+  saveButton.addEventListener('click', function(event) {
+    event.preventDefault();
     saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
-  };
+  });
   buttonContainer.appendChild(saveButton);
   
   // 読み上げボタン
   const speakButton = document.createElement('button');
   speakButton.className = 'control-btn';
   speakButton.innerHTML = '🔊 よみあげ';
-  speakButton.onclick = () => {
+  speakButton.addEventListener('click', function(event) {
+    event.preventDefault();
     speakText(`${state.currentChar}`);
-  };
+  });
   buttonContainer.appendChild(speakButton);
   
-  // 判定ボタン
-  buttonContainer.appendChild(createCheckButton());
+  // 判定ボタン - モバイルでより目立つように
+  const checkButton = createCheckButton();
+  if (isMobileDevice()) {
+    checkButton.style.backgroundColor = '#ff5c5c';
+    checkButton.style.fontWeight = 'bold';
+  }
+  buttonContainer.appendChild(checkButton);
 }
 
 // キャンバスをリセット
@@ -663,8 +703,8 @@ function updateDisplayChar() {
   
   // すべてのカテゴリでKleeフォントを使用
   push();
-  // スマホの場合は文字サイズを調整
-  let textSizeValue = isMobileDevice() ? min(width, height) * 0.6 : min(width, height) * 0.7;
+  // スマホの場合は文字サイズを大きくする
+  let textSizeValue = isMobileDevice() ? min(width, height) * 0.8 : min(width, height) * 0.7;
   textSize(textSizeValue);
   textAlign(CENTER, CENTER);
   textFont('Klee One'); // Kleeフォントを使用
@@ -698,8 +738,14 @@ function updateDisplayChar() {
 function createCheckButton() {
   const checkButton = document.createElement('button');
   checkButton.className = 'control-btn';
+  checkButton.id = 'judge-button'; // IDを追加
   checkButton.innerHTML = '✓ はんてい';
-  checkButton.onclick = () => {
+  
+  // より確実に動作させるためにaddEventListenerを使用
+  checkButton.addEventListener('click', function(event) {
+    event.preventDefault();
+    console.log('はんていボタンがクリックされました');
+    
     // 文字テンプレートの更新確認
     if (!state.templateCreated) {
       createTemplateImage();
@@ -711,7 +757,8 @@ function createCheckButton() {
     
     // 結果表示の更新
     updateDisplayChar();
-  };
+  });
+  
   return checkButton;
 }
 
@@ -999,9 +1046,9 @@ function windowResized() {
   let canvasWidth, canvasHeight;
   
   if (isMobileDevice()) {
-    // モバイル用のサイズ設定
-    canvasWidth = min(windowWidth - 20, 500);
-    canvasHeight = min(windowHeight - 350, 400);
+    // モバイル用のサイズ設定（さらに小さく）
+    canvasWidth = min(windowWidth - 10, 400);
+    canvasHeight = min(windowHeight - 280, 320);
   } else {
     // PC用のサイズ設定
     canvasWidth = min(windowWidth - 40, 800);
@@ -1015,6 +1062,9 @@ function windowResized() {
     templateBuffer.resizeCanvas(canvasWidth, canvasHeight);
     state.templateCreated = false; // テンプレートを再作成する必要がある
   }
+  
+  // UIの再構築も検討
+  createUI();
   
   updateDisplayChar();
 }
