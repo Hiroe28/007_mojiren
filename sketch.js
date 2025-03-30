@@ -435,12 +435,15 @@ function createTemplateImage() {
   templateBuffer.clear();
   templateBuffer.background(255, 0); // 透明な背景
   
+  // Y位置を調整（キャンバスの40%の位置に配置して文字位置と合わせる）
+  let yPosition = isMobileDevice() ? templateBuffer.height * 0.4 : templateBuffer.height * 0.45;
+  
   // すべてのカテゴリで同じ処理
   templateBuffer.push();
   templateBuffer.textSize(min(width, height) * 0.7);
   templateBuffer.textAlign(CENTER, CENTER);
   templateBuffer.fill(0, 0, 0, 255); // 黒でクリアに
-  templateBuffer.text(state.currentChar, width/2, height/2);
+  templateBuffer.text(state.currentChar, templateBuffer.width/2, yPosition);
   templateBuffer.pop();
   
   state.templateCreated = true;
@@ -448,8 +451,9 @@ function createTemplateImage() {
 
 // 数字用の簡略化されたテンプレートを作成
 function createSimplifiedNumberTemplate() {
+  // Y位置を調整（キャンバスの40%の位置に配置して文字位置と合わせる）
   const centerX = width / 2;
-  const centerY = height / 2;
+  const centerY = isMobileDevice() ? height * 0.4 : height * 0.45;
   const size = min(width, height) * 0.6; // サイズを少し小さく
   
   templateBuffer.push();
@@ -800,19 +804,42 @@ function showFriendlyFeedback() {
     playTryAgainSound();
   }
   
-  // フィードバック表示 - モバイル向けに位置調整
+  // フィードバック表示 - 位置を明確に指定
   textAlign(CENTER, TOP);
-  // スマホではより小さく、上部に寄せる
+  
+  // デバッグ情報を表示（開発中は有効にする）
+  let debugMode = true;
+  if (debugMode) {
+    textSize(12);
+    fill(100);
+    text(`判定結果: ${state.accuracy}点`, width/2, 5);
+  }
+  
+  // モバイルデバイスでの表示位置調整
+  let yPosEmoji, yPosMessage;
+  
   if (isMobileDevice()) {
-    textSize(28);
-    text(emoji, width/2, 10);
+    // モバイル用表示位置 - 文字の下に表示
+    yPosEmoji = height * 0.65;
+    yPosMessage = height * 0.75;
+    
+    textSize(36);
+    fill(color);
+    text(emoji, width/2, yPosEmoji);
+    
     textSize(24);
-    text(message, width/2, 45);
+    text(message, width/2, yPosMessage);
   } else {
-    textSize(32);
-    text(emoji, width/2, 15);
+    // PC用表示位置 - 文字の下に表示
+    yPosEmoji = height * 0.7;
+    yPosMessage = height * 0.8;
+    
+    textSize(40);
+    fill(color);
+    text(emoji, width/2, yPosEmoji);
+    
     textSize(28);
-    text(message, width/2, 55);
+    text(message, width/2, yPosMessage);
   }
   
   pop();
@@ -830,7 +857,10 @@ function updateDisplayChar() {
   textAlign(CENTER, CENTER);
   textFont('Klee One'); // Kleeフォントを使用
   fill(220, 220, 220); // 透明度なしの薄いグレー
-  text(state.currentChar, width/2, height/2);
+  
+  // Y位置を少し上に調整（キャンバスの40%の位置に配置）
+  let yPosition = isMobileDevice() ? height * 0.4 : height * 0.45;
+  text(state.currentChar, width/2, yPosition);
   pop();
   
   // ユーザーの描画を再描画
@@ -874,6 +904,7 @@ function createCheckButton() {
       
       // 新しい判定ロジックで計算
       state.accuracy = calculateFriendlyScore();
+      console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
       state.showAccuracy = true;
       
       // 結果表示の更新
@@ -894,6 +925,7 @@ function createCheckButton() {
       
       // 新しい判定ロジックで計算
       state.accuracy = calculateFriendlyScore();
+      console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
       state.showAccuracy = true;
       
       // 結果表示の更新
