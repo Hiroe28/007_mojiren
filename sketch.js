@@ -102,7 +102,13 @@ function setup() {
   // モバイルタッチ対応の追加処理
   if (isTouchDevice()) {
     console.log('タッチデバイスを検出しました');
+    // スケッチホルダーのスタイルを確認・設定
     const sketchHolder = document.getElementById('sketch-holder');
+    if (sketchHolder) {
+      sketchHolder.style.position = 'relative';
+      sketchHolder.style.touchAction = 'none';
+    }
+    
     // スケッチ領域内のタッチイベントはデフォルト動作を防止
     sketchHolder.addEventListener('touchstart', function(e) {
       // キャンバス内のタッチのみpreventDefault
@@ -1078,114 +1084,74 @@ function mouseReleased() {
 }
 
 function touchStarted() {
-  const canvas = document.getElementById('defaultCanvas0');
-  if (!canvas) return false;
-  
-  const rect = canvas.getBoundingClientRect();
-  
-  if (touches.length > 0) {
-    // タッチイベントから正確な座標を取得
-    const touchX = touches[0].clientX;
-    const touchY = touches[0].clientY;
+  // p5.jsのキャンバス内かどうかの判定に戻す
+  if (isMouseInsideCanvas()) {
+    state.isDrawing = true;
+    state.userStrokes.push([]);
     
-    // キャンバス上の相対座標に変換
-    const canvasX = touchX - rect.left;
-    const canvasY = touchY - rect.top;
+    // これが重要：タッチイベント処理の開始を記録
+    console.log('タッチ描画開始: x=' + touchX + ', y=' + touchY);
     
-    // スケール比率を考慮（高解像度ディスプレイ対応）
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    // 最終的な座標
-    const finalX = canvasX * scaleX;
-    const finalY = canvasY * scaleY;
-    
-    console.log(`タッチ開始: client=(${touchX}, ${touchY}), canvas=(${finalX}, ${finalY})`);
-    
-    // キャンバス内かチェック
-    if (finalX >= 0 && finalX <= width && finalY >= 0 && finalY <= height) {
-      state.isDrawing = true;
-      state.userStrokes.push([]);
-      
-      // キャンバス内のタッチのみデフォルト動作を防止
-      return false;
-    }
+    // カスタム座標変換は行わない
+    return false; // p5.jsのデフォルト動作を防ぐ
   }
-  
-  // キャンバス外のタッチではデフォルト動作を許可
-  return true;
+  return true; // キャンバス外ではデフォルト動作を許可
 }
 
-
-// タッチ移動時の座標計算を完全に修正
 function touchMoved() {
-  if (!state.isDrawing) return false;
+  if (!state.isDrawing) return true;
   
-  if (touches.length > 0) {
+  // p5.jsが提供するtouchX, touchYを使用
+  if (isMouseInsideCanvas()) {
     let currentStroke = state.userStrokes[state.userStrokes.length - 1];
     
-    // より確実なタッチ座標検出
-    const canvas = document.getElementById('defaultCanvas0');
-    const rect = canvas.getBoundingClientRect();
+    // 点の情報を保存（p5.jsの座標系を使用）
+    currentStroke.push({
+      x: mouseX,
+      y: mouseY,
+      color: state.strokeColor,
+      weight: state.strokeWidth
+    });
     
-    // タッチイベントから正確な座標を取得
-    const touchX = touches[0].clientX;
-    const touchY = touches[0].clientY;
+    // 線を描画
+    push();
+    stroke(state.strokeColor);
+    strokeWeight(state.strokeWidth);
     
-    // キャンバス上の相対座標に変換
-    const canvasX = touchX - rect.left;
-    const canvasY = touchY - rect.top;
-    
-    // スケール比率を考慮（高解像度ディスプレイ対応）
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    
-    // 最終的な座標
-    const finalX = canvasX * scaleX;
-    const finalY = canvasY * scaleY;
-    
-    console.log(`タッチ座標: client=(${touchX}, ${touchY}), canvas=(${finalX}, ${finalY})`);
-    
-    // キャンバス内の有効な座標かチェック
-    if (finalX >= 0 && finalX <= width && finalY >= 0 && finalY <= height) {
-      // 点の情報を保存
-      currentStroke.push({
-        x: finalX,
-        y: finalY,
-        color: state.strokeColor,
-        weight: state.strokeWidth
-      });
-      
-      // 線を描画
-      push();
-      stroke(state.strokeColor);
-      strokeWeight(state.strokeWidth);
-      
-      if (currentStroke.length > 1) {
-        let prev = currentStroke[currentStroke.length - 2];
-        let curr = currentStroke[currentStroke.length - 1];
-        line(prev.x, prev.y, curr.x, curr.y);
-      }
-      
-      pop();
+    if (currentStroke.length > 1) {
+      let prev = currentStroke[currentStroke.length - 2];
+      let curr = currentStroke[currentStroke.length - 1];
+      line(prev.x, prev.y, curr.x, curr.y);
     }
     
-    // デフォルト動作を防止
-    return false;
+    pop();
+    
+    return false; // p5.jsのデフォルト動作を防ぐ
   }
-  return false;
+  
+  return true; // キャンバス外ではデフォルト動作を許可
 }
 
 
 // タッチエンド - p5.jsのタッチイベント
 function touchEnded() {
+  // 描画モードを必ず終了
   state.isDrawing = false;
-  // falseを返さないことでタッチイベントを伝播させる
+  console.log('タッチ描画終了');
+  
+  // デフォルト動作を許可
+  return true;
 }
 
-// マウスがキャンバス内にあるかチェック
+// キャンバス内にタッチ/マウスがあるかチェック - 修正版
 function isMouseInsideCanvas() {
-  return mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
+  // p5.jsが提供する座標を使用
+  return (
+    mouseX >= 0 && 
+    mouseX <= width && 
+    mouseY >= 0 && 
+    mouseY <= height
+  );
 }
 
 // キャンバスの位置情報を更新する関数 - スクロール位置も考慮
@@ -1459,48 +1425,42 @@ function setupResultDisplay() {
     oldResultDisplay.remove();
   }
   
-  // sketch-holderを取得して必ず相対位置に設定
+  // sketch-holderを取得
   const sketchHolder = document.getElementById('sketch-holder');
   if (!sketchHolder) {
     console.error('sketch-holderが見つかりません');
     return;
   }
   
-  // 親要素が相対位置かどうか確認し、設定
-  if (getComputedStyle(sketchHolder).position === 'static') {
-    sketchHolder.style.position = 'relative';
-  }
-  
   // 結果表示要素を作成
   const resultDisplay = document.createElement('div');
   resultDisplay.id = 'result-display';
   
-  // 初期スタイルをすべて一度に設定
+  // スケッチホルダーに追加
+  sketchHolder.appendChild(resultDisplay);
+  
+  // 絶対に確実にイベントが透過するように
+  resultDisplay.style.pointerEvents = 'none';
+  
+  // その他のスタイル設定
   Object.assign(resultDisplay.style, {
     position: 'absolute',
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    color: '#333',
     borderRadius: '15px',
     padding: '20px',
     width: '80%',
     maxWidth: '300px',
     textAlign: 'center',
-    fontSize: isMobileDevice() ? '24px' : '28px',
-    fontWeight: 'bold',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+    fontSize: '28px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
     zIndex: '1000',
     opacity: '0',
     transition: 'opacity 0.3s ease',
-    border: '3px solid #ffb347',
-    pointerEvents: 'none',
-    display: 'block'
+    border: '3px solid #ffb347'
   });
   
-  // スケッチホルダーに追加
-  sketchHolder.appendChild(resultDisplay);
-  
-  console.log('結果表示エリアを設定しました');
+  console.log('結果表示エリアを設定しました - タッチイベント透過モード');
 }
