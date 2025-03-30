@@ -89,11 +89,8 @@ function setup() {
   state.pixelDensity = pixelDensity();
   console.log(`デバイスピクセル比: ${state.pixelDensity}`);
   
-  // 結果表示エリアのセットアップ
+  // 結果表示エリアのセットアップ（先に実行）
   setupResultDisplay();
-  
-  // 結果表示要素を初期化
-  clearResultDisplay();
   
   // UI要素の初期化
   createUI();
@@ -119,15 +116,14 @@ function setup() {
   }, 200); // 200ミリ秒後に実行 
 }
 
-
-// 結果表示をクリアする関数
-function clearResultDisplay() {
-  const resultDisplay = document.getElementById('result-display');
-  if (resultDisplay) {
-    resultDisplay.innerHTML = '';
-    resultDisplay.style.display = 'none'; // 初期状態では非表示
-  }
-}
+// // 結果表示をクリアする関数
+// function clearResultDisplay() {
+//   const resultDisplay = document.getElementById('result-display');
+//   if (resultDisplay) {
+//     resultDisplay.innerHTML = '';
+//     resultDisplay.style.display = 'none'; // 初期状態では非表示
+//   }
+// }
 
 // UI要素を作成
 function createUI() {
@@ -384,20 +380,22 @@ function createControlPanel() {
   const resetButton = document.createElement('button');
   resetButton.className = 'control-btn';
   resetButton.innerHTML = '🔄 リセット';
-  
+
   if (isTouchDevice()) {
     resetButton.addEventListener('touchstart', function(event) {
+      event.stopPropagation(); // イベント伝播を停止
       console.log('リセットボタンタッチ');
       resetCanvas();
-      // イベントの伝播を止めない (preventDefault不使用)
-    });
+    }, { passive: false }); // passiveをfalseに設定
   } else {
     resetButton.addEventListener('click', function(event) {
       event.preventDefault();
+      event.stopPropagation(); // イベント伝播を停止
+      console.log('リセットボタンクリック');
       resetCanvas();
     });
   }
-  
+    
   buttonContainer.appendChild(resetButton);
   
   // 保存ボタン
@@ -420,28 +418,29 @@ function createControlPanel() {
   
   buttonContainer.appendChild(saveButton);
   
-  // 読み上げボタン - モバイルでの問題修正
+  // 読み上げボタン修正
   const speakButton = document.createElement('button');
   speakButton.className = 'control-btn';
-  speakButton.id = 'speak-button'; // IDを追加
+  speakButton.id = 'speak-button';
   speakButton.innerHTML = '🔊 よみあげ';
-  
-  if (isTouchDevice()) {
-    // モバイル用のイベントハンドラ強化
-    speakButton.addEventListener('touchstart', function(event) {
-      event.stopPropagation(); // イベントの伝播を止める
-      console.log('読み上げボタンタッチ');
-      
-      // iOSの制約対策: ユーザージェスチャ内で音声合成APIを呼び出す
-      setTimeout(function() {
-        speakText(`${state.currentChar}`);
-      }, 10);
-    }, { passive: false });
-  } else {
-    speakButton.addEventListener('click', function(event) {
-      event.preventDefault();
+
+  const handleSpeak = function(event) {
+    // イベントの伝播と既定の動作を停止
+    event.stopPropagation();
+    if (event.cancelable) event.preventDefault();
+    
+    console.log('よみあげボタンアクション');
+    
+    // iOSの制約対策: ユーザージェスチャ内で音声合成APIを呼び出す
+    setTimeout(function() {
       speakText(`${state.currentChar}`);
-    });
+    }, 10);
+  };
+
+  if (isTouchDevice()) {
+    speakButton.addEventListener('touchstart', handleSpeak, { passive: false });
+  } else {
+    speakButton.addEventListener('click', handleSpeak);
   }
   
   buttonContainer.appendChild(speakButton);
@@ -856,7 +855,7 @@ function calculateFriendlyScore() {
   return finalScore;
 }
 
-// フィードバック表示関数 - DOM要素を使用する方式に変更
+// フィードバック表示関数 - オーバーレイ表示に変更
 function showFriendlyFeedback() {
   if (!state.showAccuracy) return;
   
@@ -884,7 +883,6 @@ function showFriendlyFeedback() {
     playTryAgainSound();
   }
   
-  // スコアとフィードバックをログに出力（デバッグ用）
   console.log(`判定結果: ${actualScore}点, 評価: ${message}`);
   
   // DOM要素に判定結果を表示
@@ -893,37 +891,22 @@ function showFriendlyFeedback() {
     resultDisplay.innerHTML = `${emoji}<br>${message}`;
     resultDisplay.style.color = color;
     resultDisplay.style.fontWeight = 'bold';
-    resultDisplay.style.display = 'block'; // 表示設定を追加
     
-    // アニメーション効果を追加
+    // CSSクラスでは動作しない場合があるため直接スタイルを設定
+    resultDisplay.style.opacity = '1';
+    
+    // アニメーション効果
     resultDisplay.classList.remove('pop-in');
-    void resultDisplay.offsetWidth; // リフロー（アニメーションをリセット）
+    void resultDisplay.offsetWidth; // リフロー
     resultDisplay.classList.add('pop-in');
     
-    // タイムアウトを長めに設定
+    // 2秒後に自動的に消える
     setTimeout(() => {
-      // スムーズスクロールを試みる（サポートされていない環境では単純なジャンプになる）
-      try {
-        resultDisplay.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } catch(e) {
-        // 失敗した場合は通常のスクロール
-        window.scrollTo(0, resultDisplay.offsetTop - 100);
-      }
-    }, 300);
+      if (resultDisplay) resultDisplay.style.opacity = '0';
+    }, 2000);
+  } else {
+    console.error('結果表示要素が見つかりません');
   }
-  
-  // Canvas内にも簡易的に表示（バックアップとして）
-  push();
-  textAlign(CENTER, TOP);
-  
-  // デバッグ情報は本番では表示しない
-  if (state.debugMode) {
-    textSize(12);
-    fill(100);
-    text(`判定結果: ${actualScore}点`, width/2, 5);
-  }
-  
-  pop();
 }
 
 // 表示する文字を更新
@@ -1009,14 +992,23 @@ function createCheckButton() {
   return checkButton;
 }
 
-// 判定処理を関数として分離
 function executeJudgement() {
-  // 事前に結果表示をクリア
-  const resultDisplay = document.getElementById('result-display');
+  console.log('判定処理開始');
+  
+  // 結果表示要素がなければ作成
+  let resultDisplay = document.getElementById('result-display');
+  if (!resultDisplay) {
+    setupResultDisplay();
+    resultDisplay = document.getElementById('result-display');
+  }
+  
   if (resultDisplay) {
     resultDisplay.innerHTML = '判定中...';
     resultDisplay.style.color = '#666';
-    resultDisplay.style.display = 'block'; // 表示設定
+    resultDisplay.style.opacity = '1'; // 表示
+    console.log('判定中表示設定完了');
+  } else {
+    console.error('結果表示要素が見つかりません');
   }
   
   // 文字テンプレートの更新確認
@@ -1024,14 +1016,13 @@ function executeJudgement() {
     createTemplateImage();
   }
   
-  // 新しい判定ロジックで計算（少し遅延させて処理が見えるようにする）
+  // 新しい判定ロジックで計算
   setTimeout(() => {
     state.accuracy = calculateFriendlyScore();
-    console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
+    console.log(`判定結果: ${state.accuracy}点`);
     state.showAccuracy = true;
     
     // 結果表示の更新
-    updateDisplayChar();
     showFriendlyFeedback();
   }, 300);
 }
@@ -1081,8 +1072,9 @@ function mouseReleased() {
 }
 
 // タッチスタート - p5.jsのタッチイベント
+// タッチスタート - 座標計算を修正
 function touchStarted() {
-  // キャンバスの位置を更新（タッチのたびに更新して位置ずれに対応）
+  // キャンバスの位置を更新
   updateCanvasPosition();
   
   if (touches.length > 0) {
@@ -1091,21 +1083,25 @@ function touchStarted() {
     
     // キャンバスの位置情報があれば、それを使って判定
     if (state.canvasRect) {
-      const relativeX = touchX - state.canvasRect.left;
-      const relativeY = touchY - state.canvasRect.top;
+      // スクロール位置を考慮
+      const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+      const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      
+      const relativeX = touchX + scrollX - state.canvasRect.left;
+      const relativeY = touchY + scrollY - state.canvasRect.top;
       
       if (state.debugMode) {
-        console.log(`タッチ開始: raw=(${touchX}, ${touchY}), 変換後=(${relativeX}, ${relativeY})`);
+        console.log(`タッチ開始: raw=(${touchX}, ${touchY}), scroll=(${scrollX}, ${scrollY}), 変換後=(${relativeX}, ${relativeY})`);
       }
       
-      if (relativeX >= 0 && relativeX <= state.canvasRect.width && 
-          relativeY >= 0 && relativeY <= state.canvasRect.height) {
+      // キャンバス内かチェック
+      if (relativeX >= 0 && relativeX <= width && relativeY >= 0 && relativeY <= height) {
         state.isDrawing = true;
         state.userStrokes.push([]);
         return false; // キャンバス内のタッチのみpreventDefault
       }
     } else {
-      // キャンバス位置情報がなければ従来の判定を使用
+      // 従来の判定
       if (isMouseInsideCanvas()) {
         state.isDrawing = true;
         state.userStrokes.push([]);
@@ -1117,50 +1113,57 @@ function touchStarted() {
 
 
 // タッチ移動 - p5.jsのタッチイベント 
+// タッチ移動時の座標計算を修正
 function touchMoved() {
   if (!state.isDrawing) return;
   
   if (touches.length > 0) {
     let currentStroke = state.userStrokes[state.userStrokes.length - 1];
     
-    // p5.jsのtouchX, touchYを使用
+    // タッチ座標を取得
     let touchX = touches[0].x;
     let touchY = touches[0].y;
     
     // モバイルでのキャンバス内座標に変換
     if (state.canvasRect) {
-      // キャンバスの位置を考慮した相対座標に変換
-      const relativeX = touchX - state.canvasRect.left;
-      const relativeY = touchY - state.canvasRect.top;
+      // スクロール位置を考慮した正確な相対座標に変換
+      const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+      const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+      
+      const relativeX = touchX + scrollX - state.canvasRect.left;
+      const relativeY = touchY + scrollY - state.canvasRect.top;
       
       if (state.debugMode) {
-        console.log(`タッチ移動: raw=(${touchX}, ${touchY}), 変換後=(${relativeX}, ${relativeY})`);
+        console.log(`タッチ移動: raw=(${touchX}, ${touchY}), scroll=(${scrollX}, ${scrollY}), 変換後=(${relativeX}, ${relativeY})`);
       }
       
       touchX = relativeX;
       touchY = relativeY;
     }
     
-    // 点の情報を保存
-    currentStroke.push({
-      x: touchX,
-      y: touchY,
-      color: state.strokeColor,
-      weight: state.strokeWidth
-    });
-    
-    // 線を描画
-    push();
-    stroke(state.strokeColor);
-    strokeWeight(state.strokeWidth);
-    
-    if (currentStroke.length > 1) {
-      let prev = currentStroke[currentStroke.length - 2];
-      let curr = currentStroke[currentStroke.length - 1];
-      line(prev.x, prev.y, curr.x, curr.y);
+    // キャンバス内の有効な座標かチェック
+    if (touchX >= 0 && touchX <= width && touchY >= 0 && touchY <= height) {
+      // 点の情報を保存
+      currentStroke.push({
+        x: touchX,
+        y: touchY,
+        color: state.strokeColor,
+        weight: state.strokeWidth
+      });
+      
+      // 線を描画
+      push();
+      stroke(state.strokeColor);
+      strokeWeight(state.strokeWidth);
+      
+      if (currentStroke.length > 1) {
+        let prev = currentStroke[currentStroke.length - 2];
+        let curr = currentStroke[currentStroke.length - 1];
+        line(prev.x, prev.y, curr.x, curr.y);
+      }
+      
+      pop();
     }
-    
-    pop();
     
     // キャンバス内の描画中のみpreventDefault
     return false;
@@ -1179,13 +1182,18 @@ function isMouseInsideCanvas() {
   return mouseX >= 0 && mouseX <= width && mouseY >= 0 && mouseY <= height;
 }
 
-// キャンバスの位置情報を更新する関数
+// キャンバスの位置情報を更新する関数 - スクロール位置も考慮
 function updateCanvasPosition() {
   const canvas = document.getElementById('defaultCanvas0');
   if (canvas) {
     state.canvasRect = canvas.getBoundingClientRect();
+    
+    // スクロール位置も記録
+    state.scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+    state.scrollY = window.pageYOffset || document.documentElement.scrollTop;
+    
     if (state.debugMode) {
-      console.log(`キャンバス位置更新: x=${state.canvasRect.left}, y=${state.canvasRect.top}, 幅=${state.canvasRect.width}, 高さ=${state.canvasRect.height}`);
+      console.log(`キャンバス位置更新: x=${state.canvasRect.left}, y=${state.canvasRect.top}, スクロール=(${state.scrollX}, ${state.scrollY})`);
     }
   }
 }
@@ -1437,26 +1445,48 @@ function windowResized() {
   updateDisplayChar();
 }
 
-// 結果表示要素のセットアップ - setup()関数内で呼び出される
 function setupResultDisplay() {
-  // 既存の要素を確認
-  let resultDisplay = document.getElementById('result-display');
-  
-  // なければ新規作成
-  if (!resultDisplay) {
-    resultDisplay = document.createElement('div');
-    resultDisplay.id = 'result-display';
-    // sketch-holderの後に配置
-    const sketchHolder = document.getElementById('sketch-holder');
-    if (sketchHolder && sketchHolder.parentNode) {
-      sketchHolder.parentNode.insertBefore(resultDisplay, sketchHolder.nextSibling);
-    } else {
-      // 代替位置
-      document.querySelector('.container').appendChild(resultDisplay);
-    }
+  // 既存の要素があれば削除（重複を避けるため）
+  let oldResultDisplay = document.getElementById('result-display');
+  if (oldResultDisplay) {
+    oldResultDisplay.remove();
   }
   
-  // 初期状態では非表示
-  resultDisplay.style.display = 'none';
-  console.log('結果表示エリアをセットアップしました');
+  // 新規作成
+  const resultDisplay = document.createElement('div');
+  resultDisplay.id = 'result-display';
+  
+  // sketch-holderの中に配置（オーバーレイにするため）
+  const sketchHolder = document.getElementById('sketch-holder');
+  if (sketchHolder) {
+    // 追加前にsketch-holderのposition設定を確認
+    if (getComputedStyle(sketchHolder).position === 'static') {
+      sketchHolder.style.position = 'relative';
+    }
+    
+    sketchHolder.appendChild(resultDisplay);
+    
+    // 直接スタイルを適用
+    resultDisplay.style.position = 'absolute';
+    resultDisplay.style.top = '50%';
+    resultDisplay.style.left = '50%';
+    resultDisplay.style.transform = 'translate(-50%, -50%)';
+    resultDisplay.style.backgroundColor = 'rgba(255, 255, 255, 0.85)';
+    resultDisplay.style.borderRadius = '15px';
+    resultDisplay.style.padding = '20px';
+    resultDisplay.style.width = '80%';
+    resultDisplay.style.maxWidth = '300px';
+    resultDisplay.style.textAlign = 'center';
+    resultDisplay.style.fontSize = '28px';
+    resultDisplay.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+    resultDisplay.style.zIndex = '1000';
+    resultDisplay.style.opacity = '0';
+    resultDisplay.style.transition = 'opacity 0.3s ease';
+    resultDisplay.style.border = '3px solid #ffb347';
+    resultDisplay.style.pointerEvents = 'none';
+    
+    console.log('結果表示エリアをオーバーレイとしてセットアップしました');
+  } else {
+    console.error('sketch-holderが見つかりません');
+  }
 }

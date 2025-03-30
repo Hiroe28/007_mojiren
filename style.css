@@ -93,15 +93,16 @@ h1 {
 }
 
 /* スケッチホルダー（キャンバスコンテナ） */
+/* スケッチホルダーを相対位置に */
 #sketch-holder {
+  position: relative;
   width: 100%;
-  margin: 0 auto;
+  margin: 0 auto 20px auto;
   background-color: white;
   border-radius: 15px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  touch-action: none; /* タッチ操作の最適化 */
-  position: relative; /* 位置計算のための基準点 */
+  touch-action: none;
 }
 
 canvas {
@@ -307,18 +308,30 @@ button:active, .char-btn:active, .category-btn:active, .control-btn:active {
   }
 }
 
-/* 結果表示エリア */
+
+/* 結果表示エリア - オーバーレイ方式に変更 */
 #result-display {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  margin: 15px auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 15px;
   text-align: center;
-  font-size: 24px;
-  padding: 15px;
-  max-width: 90%;
-  min-height: 60px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
+  font-size: 28px;
+  padding: 20px;
+  width: 80%;
+  max-width: 300px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  pointer-events: none; /* 下のキャンバスへのイベントを透過させる */
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  border: 3px solid #ffb347; /* 柔らかい印象のボーダー */
+}
+
+#result-display.active {
+  opacity: 1;
 }
 
 /* 判定結果の表情アニメーション */
