@@ -45,6 +45,11 @@ function isMobileDevice() {
   return (window.innerWidth <= 768);
 }
 
+// タッチデバイスかどうかを判定
+function isTouchDevice() {
+  return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+}
+
 // p5.jsのセットアップ関数
 function setup() {
   // キャンバスを作成（モバイル向けに調整）
@@ -52,13 +57,13 @@ function setup() {
   
   if (isMobileDevice()) {
     // モバイル用のサイズ設定
-    canvasWidth = min(windowWidth - 10, 400);
+    canvasWidth = min(windowWidth - 10, 360);
     // モバイルでは高さを小さくして、下部のボタンが見えるようにする
-    canvasHeight = min(windowHeight - 280, 320);
+    canvasHeight = min(windowHeight - 300, 320);
   } else {
-    // PC用のサイズ設定（従来通り）
-    canvasWidth = min(windowWidth - 40, 800);
-    canvasHeight = min(windowHeight - 300, 600);
+    // PC用のサイズ設定（縮小）
+    canvasWidth = min(windowWidth - 40, 600);
+    canvasHeight = min(windowHeight - 300, 500);
   }
   
   let canvas = createCanvas(canvasWidth, canvasHeight);
@@ -77,6 +82,17 @@ function setup() {
   // 描画設定
   background(255);
   noFill();
+  
+  // モバイルタッチ対応の追加処理
+  if (isTouchDevice()) {
+    console.log('タッチデバイスを検出しました');
+    const sketchHolder = document.getElementById('sketch-holder');
+    // スケッチ領域内のタッチイベントはデフォルト動作を防止
+    sketchHolder.addEventListener('touchstart', function(e) {
+      // キャンバス内のタッチのみpreventDefault
+      e.preventDefault();
+    }, { passive: false });
+  }
   
   // 最初の文字表示を少し遅延させる
   setTimeout(() => {
@@ -117,26 +133,53 @@ function createCategoryButtons() {
     // デバッグ用にdata属性を追加
     button.setAttribute('data-category', category.id);
     
-    // クリックイベントハンドラをより確実に動作させるための修正
-    button.addEventListener('click', function(event) {
-      event.preventDefault();
-      console.log(`カテゴリ変更: ${category.id}`);
-      
-      // 全てのカテゴリボタンからactiveクラスを削除
-      document.querySelectorAll('.category-btn').forEach(btn => {
-        btn.classList.remove('active');
+    // タッチデバイス対応の処理
+    if (isTouchDevice()) {
+      // タッチスタートでタッチデバイス向けの処理を追加
+      button.addEventListener('touchstart', function(event) {
+        console.log(`カテゴリ変更タッチ: ${category.id}`);
+        
+        // 全てのカテゴリボタンからactiveクラスを削除
+        document.querySelectorAll('.category-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        
+        // タッチされたボタンにactiveクラスを追加
+        this.classList.add('active');
+        
+        // 状態を更新
+        state.currentCategory = category.id;
+        state.currentChar = characters[category.id][0];
+        
+        // UIと表示を更新
+        createCharButtons();
+        resetCanvas();
+        
+        // イベントの伝播を止めない (preventDefault不使用)
       });
-      // クリックされたボタンにactiveクラスを追加
-      this.classList.add('active');
-      
-      // 状態を更新
-      state.currentCategory = category.id;
-      state.currentChar = characters[category.id][0];
-      
-      // UIと表示を更新
-      createCharButtons();
-      resetCanvas();
-    });
+    } else {
+      // 従来のクリックイベントリスナー (非タッチデバイス用)
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        console.log(`カテゴリ変更クリック: ${category.id}`);
+        
+        // 全てのカテゴリボタンからactiveクラスを削除
+        document.querySelectorAll('.category-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        
+        // クリックされたボタンにactiveクラスを追加
+        this.classList.add('active');
+        
+        // 状態を更新
+        state.currentCategory = category.id;
+        state.currentChar = characters[category.id][0];
+        
+        // UIと表示を更新
+        createCharButtons();
+        resetCanvas();
+      });
+    }
     
     categoryDiv.appendChild(button);
   });
@@ -147,9 +190,10 @@ function createCharButtons() {
   const charDiv = document.getElementById('char-buttons');
   charDiv.innerHTML = '';
   
-  // スマホの場合は文字選択エリアの高さをさらに小さくする
+  // スマホの場合は文字選択エリアの高さをより大きくする
   if (isMobileDevice()) {
-    charDiv.style.maxHeight = '70px';
+    charDiv.style.maxHeight = '140px';  // 高さを大幅に増加
+    charDiv.style.padding = '8px 5px';
   } else {
     charDiv.style.maxHeight = '120px';
   }
@@ -157,26 +201,51 @@ function createCharButtons() {
   // 現在選択されているカテゴリを表示（デバッグ用）
   console.log(`文字ボタン生成: カテゴリ=${state.currentCategory}, 文字数=${characters[state.currentCategory].length}`);
   
-  characters[state.currentCategory].forEach(char => {
+  // 文字ボタンに直接タッチイベントリスナーを追加
+  const charArray = characters[state.currentCategory];
+  
+  charArray.forEach(char => {
     const button = document.createElement('button');
     button.className = `char-btn ${state.currentChar === char ? 'active' : ''}`;
     button.textContent = char;
     
-    // クリックイベントハンドラをより確実に動作させるための修正
-    button.addEventListener('click', function(event) {
-      event.preventDefault();
-      
-      // 全ての文字ボタンからactiveクラスを削除
-      document.querySelectorAll('.char-btn').forEach(btn => {
-        btn.classList.remove('active');
+    // タッチデバイス対応の処理
+    if (isTouchDevice()) {
+      // タッチスタートでタッチデバイス向けの処理を追加
+      button.addEventListener('touchstart', function(event) {
+        console.log(`文字ボタンタッチ: ${char}`);
+        // すべての文字ボタンからactiveクラスを削除
+        document.querySelectorAll('.char-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        
+        // クリックされたボタンにactiveクラスを追加
+        this.classList.add('active');
+        
+        // 状態を更新
+        state.currentChar = char;
+        resetCanvas();
+        
+        // イベントの伝播を止めない (preventDefault不使用)
       });
-      // クリックされたボタンにactiveクラスを追加
-      this.classList.add('active');
-      
-      // 状態を更新
-      state.currentChar = char;
-      resetCanvas();
-    });
+    } else {
+      // 従来のクリックイベントリスナー (非タッチデバイス用)
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        
+        // すべての文字ボタンからactiveクラスを削除
+        document.querySelectorAll('.char-btn').forEach(btn => {
+          btn.classList.remove('active');
+        });
+        
+        // クリックされたボタンにactiveクラスを追加
+        this.classList.add('active');
+        
+        // 状態を更新
+        state.currentChar = char;
+        resetCanvas();
+      });
+    }
     
     charDiv.appendChild(button);
   });
@@ -234,19 +303,39 @@ function createControlPanel() {
     colorOption.className = `color-option ${state.strokeColor === color ? 'active' : ''}`;
     colorOption.style.backgroundColor = color;
     
-    // クリックイベントハンドラをより確実に動作させるための修正
-    colorOption.addEventListener('click', function(event) {
-      event.preventDefault();
-      
-      // 全ての色オプションからactiveクラスを削除
-      document.querySelectorAll('.color-option').forEach(option => {
-        option.classList.remove('active');
+    // タッチデバイスかどうかで処理を分ける
+    if (isTouchDevice()) {
+      colorOption.addEventListener('touchstart', function(event) {
+        console.log(`色選択タッチ: ${color}`);
+        
+        // 全ての色オプションからactiveクラスを削除
+        document.querySelectorAll('.color-option').forEach(option => {
+          option.classList.remove('active');
+        });
+        
+        // タッチされたオプションにactiveクラスを追加
+        this.classList.add('active');
+        
+        state.strokeColor = color;
+        
+        // イベントの伝播を止めない (preventDefault不使用)
       });
-      // クリックされたオプションにactiveクラスを追加
-      this.classList.add('active');
-      
-      state.strokeColor = color;
-    });
+    } else {
+      // 従来のクリックイベントリスナー
+      colorOption.addEventListener('click', function(event) {
+        event.preventDefault();
+        
+        // 全ての色オプションからactiveクラスを削除
+        document.querySelectorAll('.color-option').forEach(option => {
+          option.classList.remove('active');
+        });
+        
+        // クリックされたオプションにactiveクラスを追加
+        this.classList.add('active');
+        
+        state.strokeColor = color;
+      });
+    }
     
     colorContainer.appendChild(colorOption);
   });
@@ -266,30 +355,60 @@ function createControlPanel() {
   const resetButton = document.createElement('button');
   resetButton.className = 'control-btn';
   resetButton.innerHTML = '🔄 リセット';
-  resetButton.addEventListener('click', function(event) {
-    event.preventDefault();
-    resetCanvas();
-  });
+  
+  if (isTouchDevice()) {
+    resetButton.addEventListener('touchstart', function(event) {
+      console.log('リセットボタンタッチ');
+      resetCanvas();
+      // イベントの伝播を止めない (preventDefault不使用)
+    });
+  } else {
+    resetButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      resetCanvas();
+    });
+  }
+  
   buttonContainer.appendChild(resetButton);
   
   // 保存ボタン
   const saveButton = document.createElement('button');
   saveButton.className = 'control-btn';
   saveButton.innerHTML = '💾 ほぞん';
-  saveButton.addEventListener('click', function(event) {
-    event.preventDefault();
-    saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
-  });
+  
+  if (isTouchDevice()) {
+    saveButton.addEventListener('touchstart', function(event) {
+      console.log('保存ボタンタッチ');
+      saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
+      // イベントの伝播を止めない (preventDefault不使用)
+    });
+  } else {
+    saveButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
+    });
+  }
+  
   buttonContainer.appendChild(saveButton);
   
   // 読み上げボタン
   const speakButton = document.createElement('button');
   speakButton.className = 'control-btn';
   speakButton.innerHTML = '🔊 よみあげ';
-  speakButton.addEventListener('click', function(event) {
-    event.preventDefault();
-    speakText(`${state.currentChar}`);
-  });
+  
+  if (isTouchDevice()) {
+    speakButton.addEventListener('touchstart', function(event) {
+      console.log('読み上げボタンタッチ');
+      speakText(`${state.currentChar}`);
+      // イベントの伝播を止めない (preventDefault不使用)
+    });
+  } else {
+    speakButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      speakText(`${state.currentChar}`);
+    });
+  }
+  
   buttonContainer.appendChild(speakButton);
   
   // 判定ボタン - モバイルでより目立つように
@@ -297,6 +416,8 @@ function createControlPanel() {
   if (isMobileDevice()) {
     checkButton.style.backgroundColor = '#ff5c5c';
     checkButton.style.fontWeight = 'bold';
+    checkButton.style.fontSize = '15px';
+    checkButton.style.padding = '8px 16px';
   }
   buttonContainer.appendChild(checkButton);
 }
@@ -741,23 +862,44 @@ function createCheckButton() {
   checkButton.id = 'judge-button'; // IDを追加
   checkButton.innerHTML = '✓ はんてい';
   
-  // より確実に動作させるためにaddEventListenerを使用
-  checkButton.addEventListener('click', function(event) {
-    event.preventDefault();
-    console.log('はんていボタンがクリックされました');
-    
-    // 文字テンプレートの更新確認
-    if (!state.templateCreated) {
-      createTemplateImage();
-    }
-    
-    // 新しい判定ロジックで計算
-    state.accuracy = calculateFriendlyScore();
-    state.showAccuracy = true;
-    
-    // 結果表示の更新
-    updateDisplayChar();
-  });
+  // タッチデバイスかどうかで処理を分ける
+  if (isTouchDevice()) {
+    checkButton.addEventListener('touchstart', function(event) {
+      console.log('はんていボタンタッチ');
+      
+      // 文字テンプレートの更新確認
+      if (!state.templateCreated) {
+        createTemplateImage();
+      }
+      
+      // 新しい判定ロジックで計算
+      state.accuracy = calculateFriendlyScore();
+      state.showAccuracy = true;
+      
+      // 結果表示の更新
+      updateDisplayChar();
+      
+      // イベントの伝播を止めない (preventDefault不使用)
+    });
+  } else {
+    // 従来のクリックイベントリスナー
+    checkButton.addEventListener('click', function(event) {
+      event.preventDefault();
+      console.log('はんていボタンがクリックされました');
+      
+      // 文字テンプレートの更新確認
+      if (!state.templateCreated) {
+        createTemplateImage();
+      }
+      
+      // 新しい判定ロジックで計算
+      state.accuracy = calculateFriendlyScore();
+      state.showAccuracy = true;
+      
+      // 結果表示の更新
+      updateDisplayChar();
+    });
+  }
   
   return checkButton;
 }
@@ -810,10 +952,12 @@ function mouseReleased() {
 function touchStarted() {
   if (!isMouseInsideCanvas()) return;
   
-  // Prevent default touch behavior
   if (touches.length > 0) {
     state.isDrawing = true;
     state.userStrokes.push([]);
+    
+    // キャンバス内のタッチのみpreventDefault
+    // これは描画のスクロール防止のためだけに使用
     return false;
   }
 }
@@ -849,6 +993,8 @@ function touchMoved() {
     }
     
     pop();
+    
+    // キャンバス内の描画中のみpreventDefault
     return false;
   }
 }
@@ -856,7 +1002,7 @@ function touchMoved() {
 // タッチエンド
 function touchEnded() {
   state.isDrawing = false;
-  return false;
+  // falseを返さないことでタッチイベントを伝播させる
 }
 
 // マウスがキャンバス内にあるかチェック

@@ -44,6 +44,26 @@
 // イベントの伝播を確実に行うために追加
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM完全ロード済み');
+    
+    // モバイルデバイス向けの特別なタッチ処理を追加
+    function isTouchDevice() {
+        return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    }
+    
+    if (isTouchDevice()) {
+        console.log('タッチデバイスを検出 - スペシャルモードを有効化');
+        
+        // タッチ開始時のハンドラ
+        document.addEventListener('touchstart', function(e) {
+            // キャンバス内のタッチは既に処理されるので、ここでは何もしない
+            // ボタンのタッチは伝播させる
+        }, false);
+        
+        // ダブルタップによるズームを防止
+        document.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+    }
 });
 </script>
 <script src="sketch.js"></script>
