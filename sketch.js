@@ -1122,35 +1122,58 @@ function calculateFriendlyScore() {
   return finalScore;
 }
 
-// フィードバック表示関数の改善
+
+// 評価表示の基準緩和版
 function showFriendlyFeedback() {
   if (!state.showAccuracy) return;
   
   // 評価のレベルに応じた設定
   let emoji, message, color;
   
-  // 評価を適切に分ける - 基準を緩和
+  // 評価を適切に分ける - 基準を大幅に緩和
   const actualScore = state.accuracy;
+  const isMobile = isMobileDevice();
   
-  // 実際の判定に基づいて評価を決定
-  if (actualScore >= 50) {  // 60から50に下げる
-    emoji = '⭐⭐⭐';
-    message = 'すごい！';
-    color = '#4CAF50'; // 緑
-    playSuccessSound();
-  } else if (actualScore >= 25) {  // 30から25に下げる
-    emoji = '⭐⭐';
-    message = 'がんばったね！';
-    color = '#FFC107'; // 黄色
-    playGoodSound();
+  // モバイル向けに特に緩和した基準
+  if (isMobile) {
+    // モバイルではさらに基準を下げる
+    if (actualScore >= 45) {  // 50→45に下げる
+      emoji = '⭐⭐⭐';
+      message = 'すごい！';
+      color = '#4CAF50'; // 緑
+      playSuccessSound();
+    } else if (actualScore >= 20) {  // 25→20に下げる
+      emoji = '⭐⭐';
+      message = 'がんばったね！';
+      color = '#FFC107'; // 黄色
+      playGoodSound();
+    } else {
+      emoji = '⭐';
+      message = 'もう一度チャレンジ！';
+      color = '#FF5722'; // オレンジ
+      playTryAgainSound();
+    }
   } else {
-    emoji = '⭐';
-    message = 'もう一度チャレンジ！';
-    color = '#FF5722'; // オレンジ
-    playTryAgainSound();
+    // PC向けの基準（前回の調整通り）
+    if (actualScore >= 50) {
+      emoji = '⭐⭐⭐';
+      message = 'すごい！';
+      color = '#4CAF50'; // 緑
+      playSuccessSound();
+    } else if (actualScore >= 25) {
+      emoji = '⭐⭐';
+      message = 'がんばったね！';
+      color = '#FFC107'; // 黄色
+      playGoodSound();
+    } else {
+      emoji = '⭐';
+      message = 'もう一度チャレンジ！';
+      color = '#FF5722'; // オレンジ
+      playTryAgainSound();
+    }
   }
   
-  // DOM要素に判定結果を表示
+  // DOM要素に判定結果を表示（以下は変更なし）
   const resultDisplay = document.getElementById('result-display');
   if (!resultDisplay) {
     console.error('結果表示要素が見つかりません');
