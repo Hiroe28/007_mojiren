@@ -119,6 +119,22 @@ canvas {
   flex-wrap: wrap;
 }
 
+@media (max-width: 480px) {
+  #control-panel {
+      margin-top: 5px;
+      flex-direction: column;
+      gap: 5px;
+      position: sticky; /* 固定ではなくスティッキー配置に変更 */
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: rgba(255, 255, 255, 0.95);
+      padding: 5px;
+      z-index: 100;
+      border-top: 1px solid #ddd;
+  }
+}
+
 /* ボタンコンテナ用のスタイル追加 */
 #button-container {
   display: flex;
@@ -274,39 +290,56 @@ button:active, .char-btn:active, .category-btn:active, .control-btn:active {
   touch-action: none;
 }
 
-/* スクロール防止 - モバイルデバイスでのみ適用 */
+/* スクロール防止 - 修正：固定スクロールをやめて通常のスクロールを許可 */
 @media (max-width: 768px) {
   html, body {
-      overscroll-behavior: none;
-      position: fixed;
-      overflow: hidden;
+      overscroll-behavior: none; /* これだけ残す */
+      margin: 0;
+      padding: 0;
       width: 100%;
-      height: 100%;
   }
 
   body {
-      position: relative;
-      overflow-y: auto;
+      overflow-y: auto; /* 通常のスクロールを許可 */
       overflow-x: hidden;
+      height: auto; /* 高さ自動 */
+      min-height: 100vh;
   }
 }
 
-/* iOS Safari のダブルタップズームを防止 */
-* {
-  touch-action: manipulation;
+/* 結果表示エリア */
+#result-display {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  margin: 15px auto;
+  text-align: center;
+  font-size: 24px;
+  padding: 15px;
+  max-width: 90%;
+  min-height: 60px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
 }
 
-/* 判定ボタンをモバイルデバイスで強調 */
-@media (max-width: 480px) {
-  #judge-button {
-      background-color: #ff5c5c !important;
-      font-weight: bold !important;
-      font-size: 15px !important;
-      padding: 8px 12px !important;
-  }
-  
-  /* 固定されたスクロールに対応 */
-  .container {
-      padding-bottom: 120px;
+/* 判定結果の表情アニメーション */
+@keyframes pop {
+  0% { transform: scale(0.8); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.pop-in {
+  animation: pop 0.5s ease-out;
+}
+
+/* モバイル用下部の余白 */
+.mobile-spacer {
+  height: 100px;
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-spacer {
+      display: block;
   }
 }

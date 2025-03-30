@@ -61,8 +61,8 @@ function setup() {
   if (isMobileDevice()) {
     // モバイル用のサイズ設定 - 固定値ではなく比率で計算
     canvasWidth = min(windowWidth - 20, 400);
-    // モバイルでは画面の60%をキャンバスに使用（固定値の減算ではなく）
-    canvasHeight = min(windowHeight * 0.6, 400);
+    // モバイルでは画面の50%をキャンバスに使用（60%→50%に縮小）
+    canvasHeight = min(windowHeight * 0.5, 350);
     console.log(`モバイルキャンバスサイズ: ${canvasWidth}x${canvasHeight}, 画面サイズ: ${windowWidth}x${windowHeight}`);
   } else {
     // PC用のサイズ設定（縮小）
@@ -75,6 +75,7 @@ function setup() {
   
   // キャンバスの実際の位置とサイズをログ出力（デバッグ用）
   const canvasRect = canvas.elt.getBoundingClientRect();
+  state.canvasRect = canvasRect;
   console.log(`キャンバス実際の位置: x=${canvasRect.left}, y=${canvasRect.top}, 幅=${canvasRect.width}, 高さ=${canvasRect.height}`);
   
   // テンプレートバッファの初期化
@@ -87,6 +88,9 @@ function setup() {
   // デバイスピクセル比を記録（高解像度デバイス対応）
   state.pixelDensity = pixelDensity();
   console.log(`デバイスピクセル比: ${state.pixelDensity}`);
+  
+  // 結果表示要素を初期化
+  clearResultDisplay();
   
   // UI要素の初期化
   createUI();
@@ -110,6 +114,15 @@ function setup() {
   setTimeout(() => {
     updateDisplayChar();
   }, 200); // 200ミリ秒後に実行 
+}
+
+// 結果表示をクリアする関数
+function clearResultDisplay() {
+  const resultDisplay = document.getElementById('result-display');
+  if (resultDisplay) {
+    resultDisplay.innerHTML = '';
+    resultDisplay.style.display = 'none'; // 初期状態では非表示
+  }
 }
 
 // UI要素を作成
@@ -839,18 +852,17 @@ function calculateFriendlyScore() {
   return finalScore;
 }
 
-// フィードバック表示関数
+// フィードバック表示関数 - DOM要素を使用する方式に変更
 function showFriendlyFeedback() {
   if (!state.showAccuracy) return;
   
-  push();
   // 評価のレベルに応じた設定
   let emoji, message, color;
   
-  // 評価を適切に分ける（モバイルでも適切な評価を返すように）
+  // 評価を適切に分ける
   const actualScore = state.accuracy;
   
-  // 実際の判定に基づいて評価を決定（閾値はそのまま）
+  // 実際の判定に基づいて評価を決定
   if (actualScore >= 60) {
     emoji = '⭐⭐⭐';
     message = 'すごい！';
@@ -871,7 +883,26 @@ function showFriendlyFeedback() {
   // スコアとフィードバックをログに出力（デバッグ用）
   console.log(`判定結果: ${actualScore}点, 評価: ${message}`);
   
-  // フィードバック表示 - 位置を明確に指定
+  // DOM要素に判定結果を表示
+  const resultDisplay = document.getElementById('result-display');
+  if (resultDisplay) {
+    resultDisplay.innerHTML = `${emoji}<br>${message}`;
+    resultDisplay.style.color = color;
+    resultDisplay.style.fontWeight = 'bold';
+    
+    // アニメーション効果を追加
+    resultDisplay.classList.remove('pop-in');
+    void resultDisplay.offsetWidth; // リフロー（アニメーションをリセット）
+    resultDisplay.classList.add('pop-in');
+    
+    // スクロールして結果を表示
+    setTimeout(() => {
+      resultDisplay.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  }
+  
+  // Canvas内にも簡易的に表示（バックアップとして）
+  push();
   textAlign(CENTER, TOP);
   
   // デバッグ情報は本番では表示しない
@@ -879,34 +910,6 @@ function showFriendlyFeedback() {
     textSize(12);
     fill(100);
     text(`判定結果: ${actualScore}点`, width/2, 5);
-  }
-  
-  // モバイルデバイスでの表示位置調整
-  let yPosEmoji, yPosMessage;
-  
-  if (isMobileDevice()) {
-    // モバイル用表示位置 - 文字より下の空きスペースに表示
-    yPosEmoji = height * 0.55;  // 0.75→0.55へ移動
-    yPosMessage = height * 0.65; // 0.85→0.65へ移動
-    
-    // サイズを大きく
-    textSize(48);
-    fill(color);
-    text(emoji, width/2, yPosEmoji);
-    
-    textSize(32);
-    text(message, width/2, yPosMessage);
-  } else {
-    // PC用表示位置 - 文字の下に表示
-    yPosEmoji = height * 0.7;
-    yPosMessage = height * 0.8;
-    
-    textSize(40);
-    fill(color);
-    text(emoji, width/2, yPosEmoji);
-    
-    textSize(28);
-    text(message, width/2, yPosMessage);
   }
   
   pop();
@@ -959,32 +962,25 @@ function createCheckButton() {
   checkButton.id = 'judge-button'; // IDを追加
   checkButton.innerHTML = '✓ はんてい';
   
+  // モバイルでは強調表示
+  if (isMobileDevice()) {
+    checkButton.style.backgroundColor = '#ff5c5c';
+    checkButton.style.fontWeight = 'bold';
+    checkButton.style.fontSize = '15px';
+    checkButton.style.padding = '10px 20px';
+  }
+  
   // タッチデバイスかどうかで処理を分ける
   if (isTouchDevice()) {
     checkButton.addEventListener('touchstart', function(event) {
       console.log('はんていボタンタッチ');
       
-      // 文字テンプレートの更新確認
-      if (!state.templateCreated) {
-        createTemplateImage();
-      }
+      // ボタン押下の視覚的フィードバック
+      this.style.opacity = '0.7';
+      setTimeout(() => { this.style.opacity = '1'; }, 150);
       
-      // 新しい判定ロジックで計算
-      state.accuracy = calculateFriendlyScore();
-      console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
-      state.showAccuracy = true;
-      
-      // 結果表示の更新
-      updateDisplayChar();
-      
-      // 結果を表示するためにスクロールを制御
-      if (isMobileDevice()) {
-        // キャンバスがある位置に自動スクロール
-        const canvasElement = document.getElementById('sketch-holder');
-        if (canvasElement) {
-          canvasElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
+      // 判定処理の実行
+      executeJudgement();
       
       // イベントの伝播を止めない (preventDefault不使用)
     });
@@ -994,22 +990,38 @@ function createCheckButton() {
       event.preventDefault();
       console.log('はんていボタンがクリックされました');
       
-      // 文字テンプレートの更新確認
-      if (!state.templateCreated) {
-        createTemplateImage();
-      }
-      
-      // 新しい判定ロジックで計算
-      state.accuracy = calculateFriendlyScore();
-      console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
-      state.showAccuracy = true;
-      
-      // 結果表示の更新
-      updateDisplayChar();
+      // 判定処理の実行
+      executeJudgement();
     });
   }
   
   return checkButton;
+}
+
+// 判定処理を関数として分離
+function executeJudgement() {
+  // 事前に結果表示をクリア
+  const resultDisplay = document.getElementById('result-display');
+  if (resultDisplay) {
+    resultDisplay.innerHTML = '判定中...';
+    resultDisplay.style.color = '#666';
+  }
+  
+  // 文字テンプレートの更新確認
+  if (!state.templateCreated) {
+    createTemplateImage();
+  }
+  
+  // 新しい判定ロジックで計算（少し遅延させて処理が見えるようにする）
+  setTimeout(() => {
+    state.accuracy = calculateFriendlyScore();
+    console.log(`判定結果: ${state.accuracy}点`); // デバッグログ追加
+    state.showAccuracy = true;
+    
+    // 結果表示の更新
+    updateDisplayChar();
+    showFriendlyFeedback();
+  }, 300);
 }
 
 // マウスが押された時
