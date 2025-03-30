@@ -631,7 +631,10 @@ function checkKeyPointsCoverage() {
   const coveredKeyPoints = [];
   
   // ユーザーの線からある距離内にあるキーポイントは「カバーされた」と見なす
-  const coverageDistance = state.strokeWidth * 1.5; // 少し大きめの範囲に
+  // モバイルではやや広めに取る
+  const coverageDistance = isMobileDevice() ? 
+                          state.strokeWidth * 2.2 : // モバイルではより広い範囲を許容
+                          state.strokeWidth * 1.5;  // PCでの値
   
   for (const point of keyPoints) {
     let covered = false;
@@ -659,7 +662,14 @@ function checkKeyPointsCoverage() {
   }
   
   // キーポイントのカバレッジ率を計算
-  return keyPoints.length > 0 ? (coveredKeyPoints.length / keyPoints.length) * 100 : 0;
+  let coverageRate = keyPoints.length > 0 ? (coveredKeyPoints.length / keyPoints.length) * 100 : 0;
+  
+  // モバイル環境の場合は判定を緩くする補正
+  if (isMobileDevice() && coverageRate > 0) {
+    coverageRate = Math.min(100, coverageRate * 1.2); // 20%増加
+  }
+  
+  return coverageRate;
 }
 
 // 正確さを判定する関数（文字上のなぞり率）
@@ -677,11 +687,33 @@ function checkAccuracy() {
       totalPoints++;
       
       // ポイントがテンプレート上にあるか確認
-      let pixelColor = templateBuffer.get(point.x, point.y);
-      
-      // ピクセルの不透明度が一定以上ならテンプレート上にあると判断
-      if (pixelColor[3] > 0) { // アルファ値をチェック
-        pointsOnTemplate++;
+      // モバイルではより広い範囲をチェック
+      if (isMobileDevice()) {
+        // モバイルデバイスの場合、点の周辺もチェック
+        const checkRadius = 3; // ピクセル単位で周辺もチェック
+        let isOnTemplate = false;
+        
+        // 点の周辺もチェック
+        for (let offsetY = -checkRadius; offsetY <= checkRadius; offsetY++) {
+          for (let offsetX = -checkRadius; offsetX <= checkRadius; offsetX++) {
+            let pixelColor = templateBuffer.get(point.x + offsetX, point.y + offsetY);
+            if (pixelColor[3] > 0) { // アルファ値をチェック
+              isOnTemplate = true;
+              break;
+            }
+          }
+          if (isOnTemplate) break;
+        }
+        
+        if (isOnTemplate) {
+          pointsOnTemplate++;
+        }
+      } else {
+        // PC環境では通常のチェック
+        let pixelColor = templateBuffer.get(point.x, point.y);
+        if (pixelColor[3] > 0) { // アルファ値をチェック
+          pointsOnTemplate++;
+        }
       }
     }
   }
@@ -690,8 +722,11 @@ function checkAccuracy() {
   const onTemplateRatio = totalPoints > 0 ? (pointsOnTemplate / totalPoints) : 0;
   
   // 正確さを計算 (0-100の範囲)
-  // 60%以上が文字の上にあれば満点、それ以下は比例配分
-  return Math.min(100, Math.floor(onTemplateRatio * 166.67)); // 60%で100点になるよう調整
+  // モバイルでは閾値を下げる（50%以上→40%以上）
+  const threshold = isMobileDevice() ? 40 : 60;
+  const multiplier = 100 / threshold;
+  
+  return Math.min(100, Math.floor(onTemplateRatio * multiplier * 100));
 }
 
 // カバレッジ計算（文字のどれだけをなぞれたか）
@@ -713,7 +748,8 @@ function calculateCoverage() {
   // ユーザーがなぞった文字部分をカウント
   // 簡易的にするため、ユーザーの描画ポイントから一定範囲内のピクセルをカバーしたと見なす
   let coveredPixels = new Set();
-  const radius = state.strokeWidth / 2;
+  // モバイルではストローク幅をやや広めに取る
+  const radius = isMobileDevice() ? state.strokeWidth * 0.7 : state.strokeWidth / 2;
   
   for (let userStroke of state.userStrokes) {
     for (let point of userStroke) {
@@ -733,7 +769,10 @@ function calculateCoverage() {
   // カバレッジ率を計算
   const coverage = totalTemplatePixels > 0 ? (coveredPixels.size / totalTemplatePixels) : 0;
   
-  return Math.min(100, Math.floor(coverage * 100));
+  // モバイル環境の場合は少し補正する
+  const coverageScore = Math.min(100, Math.floor(coverage * 100));
+  
+  return coverageScore;
 }
 
 // 子供向けに改善した判定関数を修正
@@ -743,14 +782,22 @@ function calculateFriendlyScore() {
   let coverageScore = calculateCoverage(); // 文字全体をなぞれたか
   let keyPointsScore = checkKeyPointsCoverage(); // 重要ポイントをなぞれたか
   
-  // 数字カテゴリの場合は特別な判定
+  // モバイル環境での判定を優しくする調整
+  if (isMobileDevice()) {
+    // モバイル環境では基本点に加点（タッチしにくいための配慮）
+    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 精度スコアを20%増加
+    coverageScore = Math.min(100, coverageScore * 1.3);  // カバレッジスコアを30%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.4); // キーポイントスコアを40%増加
+  }
+  
+  // カテゴリ別の判定調整
   if (state.currentCategory === 'numbers') {
     // 数字の場合は重要ポイント判定を優先
-    keyPointsScore = Math.min(100, keyPointsScore * 1.3); // キーポイントスコアを増強
+    keyPointsScore = Math.min(100, keyPointsScore * 1.3); // キーポイントスコアをさらに増強
     
     // 数字の場合はカバレッジ要求を下げる
     if (keyPointsScore >= 60) {
-      coverageScore = Math.max(coverageScore, 50); // キーポイントが良ければカバレッジも最低50%保証
+      coverageScore = Math.max(coverageScore, 60); // キーポイントが良ければカバレッジも最低60%保証
     }
     
     // 配分も調整（キーポイントの比重を上げる）
@@ -761,9 +808,9 @@ function calculateFriendlyScore() {
     );
   }
   
-  // ひらがな・カタカナは通常の判定
-  // 最低限のカバレッジ要件を緩和（20%に下げる）
-  if (coverageScore < 20 && keyPointsScore < 30) {
+  // ひらがな・カタカナは通常の判定だが、閾値を下げる
+  // 最低限のカバレッジ要件を緩和（15%に下げる）
+  if (coverageScore < 15 && keyPointsScore < 25) {
     return Math.min(40, Math.floor(
       accuracyScore * 0.3 + 
       coverageScore * 0.3 + 
@@ -772,11 +819,18 @@ function calculateFriendlyScore() {
   }
   
   // 重要ポイントのカバレッジを重視する配分
-  return Math.floor(
+  let finalScore = Math.floor(
     accuracyScore * 0.25 + 
     coverageScore * 0.35 + 
     keyPointsScore * 0.4
   );
+  
+  // モバイル環境では少し加点して子供が喜ぶように調整
+  if (isMobileDevice()) {
+    finalScore = Math.min(100, finalScore + 10);
+  }
+  
+  return finalScore;
 }
 
 // フィードバック表示関数
@@ -807,8 +861,8 @@ function showFriendlyFeedback() {
   // フィードバック表示 - 位置を明確に指定
   textAlign(CENTER, TOP);
   
-  // デバッグ情報を表示（開発中は有効にする）
-  let debugMode = true;
+  // デバッグ情報は本番では表示しない
+  let debugMode = false;
   if (debugMode) {
     textSize(12);
     fill(100);
