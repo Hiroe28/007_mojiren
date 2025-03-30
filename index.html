@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ひらがな・カタカナ・数字なぞり練習アプリ</title>
+    
+    <!-- p5.jsライブラリを読み込み -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    
+    <!-- スタイルシート -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Kleeフォントを読み込み -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&display=swap" rel="stylesheet">
+    
+    <!-- もしくは、自分でホストする場合は以下のCSSを別ファイルに保存 -->
+    <style>
+        @font-face {
+        font-family: 'Klee One';
+        src: url('fonts/KleeOne-Regular.woff2') format('woff2');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+        }
+        
+        @font-face {
+        font-family: 'Klee One';
+        src: url('fonts/KleeOne-SemiBold.woff2') format('woff2');
+        font-weight: 600;
+        font-style: normal;
+        font-display: swap;
+        }
+    </style>
+
+</head>
+<body>
+    <div class="container">
+        <h1>ひらがな・カタカナ・すうじ なぞりれんしゅう</h1>
+        
+        <!-- カテゴリと文字選択はJavaScriptで動的に生成 -->
+        <div id="category-buttons"></div>
+        <div id="char-buttons"></div>
+        
+        <!-- キャンバスを配置する要素 -->
+        <div id="sketch-holder"></div>
+        
+        <!-- コントロールパネル -->
+        <div id="control-panel">
+            <!-- JavaScriptで動的に生成 -->
+        </div>
+    </div>
+    
+    <!-- メインのスクリプト -->
+    <script src="sketch.js"></script>
+</body>
+</html>
