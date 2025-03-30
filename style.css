@@ -100,6 +100,8 @@ h1 {
   border-radius: 15px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  touch-action: none; /* タッチ操作の最適化 */
+  position: relative; /* 位置計算のための基準点 */
 }
 
 canvas {
