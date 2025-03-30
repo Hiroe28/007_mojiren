@@ -108,7 +108,7 @@ function setup() {
       sketchHolder.style.position = 'relative';
       sketchHolder.style.touchAction = 'none';
     }
-    
+
     // スケッチ領域内のタッチイベントはデフォルト動作を防止
     sketchHolder.addEventListener('touchstart', function(e) {
       // キャンバス内のタッチのみpreventDefault
@@ -404,25 +404,25 @@ function createControlPanel() {
     
   buttonContainer.appendChild(resetButton);
   
-  // 保存ボタン
-  const saveButton = document.createElement('button');
-  saveButton.className = 'control-btn';
-  saveButton.innerHTML = '💾 ほぞん';
+  // // 保存ボタン
+  // const saveButton = document.createElement('button');
+  // saveButton.className = 'control-btn';
+  // saveButton.innerHTML = '💾 ほぞん';
   
-  if (isTouchDevice()) {
-    saveButton.addEventListener('touchstart', function(event) {
-      console.log('保存ボタンタッチ');
-      saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
-      // イベントの伝播を止めない (preventDefault不使用)
-    });
-  } else {
-    saveButton.addEventListener('click', function(event) {
-      event.preventDefault();
-      saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
-    });
-  }
+  // if (isTouchDevice()) {
+  //   saveButton.addEventListener('touchstart', function(event) {
+  //     console.log('保存ボタンタッチ');
+  //     saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
+  //     // イベントの伝播を止めない (preventDefault不使用)
+  //   });
+  // } else {
+  //   saveButton.addEventListener('click', function(event) {
+  //     event.preventDefault();
+  //     saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
+  //   });
+  // }
   
-  buttonContainer.appendChild(saveButton);
+  // buttonContainer.appendChild(saveButton);
   
   // 読み上げボタン修正
   const speakButton = document.createElement('button');
@@ -470,19 +470,25 @@ function resetCanvas() {
   updateDisplayChar();
 }
 
-// テンプレート画像の作成を修正（数字向けに調整）
+// createTemplateImage関数を修正
 function createTemplateImage() {
   templateBuffer.clear();
   templateBuffer.background(255, 0); // 透明な背景
   
-  // Y位置を調整（キャンバスの30%の位置に配置して文字位置と合わせる）
+  // 数字カテゴリの場合は専用のテンプレート生成関数を使用
+  if (state.currentCategory === 'numbers') {
+    createSimplifiedNumberTemplate();
+    state.templateCreated = true;
+    return;
+  }
+  
+  // 他のカテゴリ（ひらがな・カタカナ）は従来通り
   let yPosition = isMobileDevice() ? templateBuffer.height * 0.3 : templateBuffer.height * 0.45;
   
-  // すべてのカテゴリで同じ処理
   templateBuffer.push();
   templateBuffer.textSize(min(width, height) * 0.7);
   templateBuffer.textAlign(CENTER, CENTER);
-  templateBuffer.fill(0, 0, 0, 255); // 黒でクリアに
+  templateBuffer.fill(0, 0, 0, 255);
   templateBuffer.text(state.currentChar, templateBuffer.width/2, yPosition);
   templateBuffer.pop();
   
@@ -831,19 +837,15 @@ function calculateFriendlyScore() {
     coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
     keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
   }
-  
-  // カテゴリ別の判定調整
-  if (state.currentCategory === 'numbers') {
-    // 数字は特に簡単に書けるように
-    keyPointsScore = Math.min(100, keyPointsScore * 1.2);
-    
-    // 配分も調整（キーポイントの比重を上げる）
-    return Math.floor(
-      accuracyScore * 0.2 + 
-      coverageScore * 0.3 + 
-      keyPointsScore * 0.5
-    );
+
+  // 単純な文字や数字に対する補正を強化
+  if (state.currentCategory === 'numbers' || 
+    ['一', '二', '三', 'イ', 'ー'].includes(state.currentChar)) {
+  // 単純な形状の文字は特に評価を緩くする
+  keyPointsScore = Math.min(100, keyPointsScore * 1.5);
+  coverageScore = Math.min(100, coverageScore * 1.3);
   }
+
   
   // ひらがな・カタカナも適切に
   let finalScore = Math.floor(
