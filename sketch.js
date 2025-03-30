@@ -1,4 +1,4 @@
-// ひらがな・カタカナ・数字なぞり練習アプリ（完全版）
+// ひらがな・カタカナ・数字なぞり練習アプリ（スマホ対応版）
 
 // 文字データ
 const characters = {
@@ -19,12 +19,6 @@ const colorPalette = [
 ];
 
 // フォントオプション
-// const fontOptions = [
-//   { id: 'sans-serif', label: '教科書体' },
-//   { id: 'serif', label: '明朝体' },
-//   { id: 'monospace', label: 'ゴシック体' },
-//   { id: 'cursive', label: '手書き風' }
-// ];
 const fontOptions = [
   { id: 'Klee One', label: 'クレー' }
 ];
@@ -46,11 +40,27 @@ let state = {
 // テンプレート（文字の輪郭）を保存するバッファ
 let templateBuffer;
 
+// デバイスがモバイルかどうかを判定する関数
+function isMobileDevice() {
+  return (window.innerWidth <= 768);
+}
+
 // p5.jsのセットアップ関数
 function setup() {
-  // キャンバスを作成
-  let canvasWidth = min(windowWidth - 40, 800);
-  let canvasHeight = min(windowHeight - 300, 600);
+  // キャンバスを作成（モバイル向けに調整）
+  let canvasWidth, canvasHeight;
+  
+  if (isMobileDevice()) {
+    // モバイル用のサイズ設定
+    canvasWidth = min(windowWidth - 20, 500);
+    // モバイルでは高さを小さくして、下部のボタンが見えるようにする
+    canvasHeight = min(windowHeight - 350, 400);
+  } else {
+    // PC用のサイズ設定（従来通り）
+    canvasWidth = min(windowWidth - 40, 800);
+    canvasHeight = min(windowHeight - 300, 600);
+  }
+  
   let canvas = createCanvas(canvasWidth, canvasHeight);
   canvas.parent('sketch-holder');
   
@@ -68,12 +78,10 @@ function setup() {
   background(255);
   noFill();
   
-
-   // 最初の文字表示を少し遅延させる
-   setTimeout(() => {
+  // 最初の文字表示を少し遅延させる
+  setTimeout(() => {
     updateDisplayChar();
-  }, 200); // 500ミリ秒後に実行 
-
+  }, 200); // 200ミリ秒後に実行 
 }
 
 // UI要素を作成
@@ -123,10 +131,17 @@ function createCategoryButtons() {
   });
 }
 
-// 文字選択ボタンを作成
+// 文字選択ボタンを作成 - スマホ向けに最適化
 function createCharButtons() {
   const charDiv = document.getElementById('char-buttons');
   charDiv.innerHTML = '';
+  
+  // スマホの場合は文字選択エリアの高さを小さくする
+  if (isMobileDevice()) {
+    charDiv.style.maxHeight = '80px';
+  } else {
+    charDiv.style.maxHeight = '120px';
+  }
   
   characters[state.currentCategory].forEach(char => {
     const button = document.createElement('button');
@@ -149,14 +164,12 @@ function createCharButtons() {
 
 // フォント選択ボタンを作成
 function createFontButtons() {
-  // フォントボタンを非表示にする場合は空の関数にする
-  // または以下のようにKleeフォントのみの選択肢を表示
-  
-  // すでにフォント選択領域がなければ作成
+  // フォントボタンを非表示にする
   if (!document.getElementById('font-buttons')) {
     const fontDiv = document.createElement('div');
     fontDiv.id = 'font-buttons';
     fontDiv.className = 'button-group';
+    fontDiv.style.display = 'none'; // 完全に非表示にする
     
     // タイトルを追加
     const title = document.createElement('div');
@@ -176,10 +189,17 @@ function preload() {
   // 何もしない - フォントをプリロードしない
 }
 
-// コントロールパネルを作成
+// コントロールパネルを作成 - スマホ向けに最適化
 function createControlPanel() {
   const controlPanel = document.getElementById('control-panel');
   controlPanel.innerHTML = '';
+  
+  // スマホ用に2段組のレイアウトに変更
+  if (isMobileDevice()) {
+    controlPanel.style.flexDirection = 'column';
+    controlPanel.style.alignItems = 'center';
+    controlPanel.style.gap = '10px';
+  }
   
   // 色選択
   const colorContainer = document.createElement('div');
@@ -203,12 +223,21 @@ function createControlPanel() {
   });
   controlPanel.appendChild(colorContainer);
   
+  // ボタンコンテナ作成（スマホの場合は2行に分けるため）
+  const buttonContainer = document.createElement('div');
+  buttonContainer.id = 'button-container';
+  buttonContainer.style.display = 'flex';
+  buttonContainer.style.flexWrap = 'wrap';
+  buttonContainer.style.justifyContent = 'center';
+  buttonContainer.style.gap = '10px';
+  controlPanel.appendChild(buttonContainer);
+  
   // リセットボタン
   const resetButton = document.createElement('button');
   resetButton.className = 'control-btn';
   resetButton.innerHTML = '🔄 リセット';
   resetButton.onclick = resetCanvas;
-  controlPanel.appendChild(resetButton);
+  buttonContainer.appendChild(resetButton);
   
   // 保存ボタン
   const saveButton = document.createElement('button');
@@ -217,7 +246,7 @@ function createControlPanel() {
   saveButton.onclick = () => {
     saveCanvas(`なぞり書き_${state.currentChar}`, 'png');
   };
-  controlPanel.appendChild(saveButton);
+  buttonContainer.appendChild(saveButton);
   
   // 読み上げボタン
   const speakButton = document.createElement('button');
@@ -226,10 +255,10 @@ function createControlPanel() {
   speakButton.onclick = () => {
     speakText(`${state.currentChar}`);
   };
-  controlPanel.appendChild(speakButton);
+  buttonContainer.appendChild(speakButton);
   
   // 判定ボタン
-  controlPanel.appendChild(createCheckButton());
+  buttonContainer.appendChild(createCheckButton());
 }
 
 // キャンバスをリセット
@@ -610,21 +639,19 @@ function showFriendlyFeedback() {
     playTryAgainSound();
   }
   
-  // フィードバック表示
+  // フィードバック表示 - モバイル向けに位置調整
   textAlign(CENTER, TOP);
-  textSize(32);
-  fill(color);
-  text(emoji, width/2, 15);
-  
-  textSize(28);
-  text(message, width/2, 55);
-  
-  // デバッグ情報（必要に応じて表示）
-  if (false) { // 通常は表示しない
-    textSize(12);
-    textAlign(RIGHT, TOP);
-    fill(150);
-    text(`精度:${checkAccuracy().toFixed(0)}%, カバー:${calculateCoverage().toFixed(0)}%, キーポイント:${checkKeyPointsCoverage().toFixed(0)}%`, width - 10, 10);
+  // スマホではより小さく、上部に寄せる
+  if (isMobileDevice()) {
+    textSize(28);
+    text(emoji, width/2, 10);
+    textSize(24);
+    text(message, width/2, 45);
+  } else {
+    textSize(32);
+    text(emoji, width/2, 15);
+    textSize(28);
+    text(message, width/2, 55);
   }
   
   pop();
@@ -636,7 +663,9 @@ function updateDisplayChar() {
   
   // すべてのカテゴリでKleeフォントを使用
   push();
-  textSize(min(width, height) * 0.7);
+  // スマホの場合は文字サイズを調整
+  let textSizeValue = isMobileDevice() ? min(width, height) * 0.6 : min(width, height) * 0.7;
+  textSize(textSizeValue);
   textAlign(CENTER, CENTER);
   textFont('Klee One'); // Kleeフォントを使用
   fill(220, 220, 220); // 透明度なしの薄いグレー
@@ -967,8 +996,18 @@ function playTryAgainSound() {
 
 // ウィンドウサイズが変更された時
 function windowResized() {
-  let canvasWidth = min(windowWidth - 40, 800);
-  let canvasHeight = min(windowHeight - 300, 600);
+  let canvasWidth, canvasHeight;
+  
+  if (isMobileDevice()) {
+    // モバイル用のサイズ設定
+    canvasWidth = min(windowWidth - 20, 500);
+    canvasHeight = min(windowHeight - 350, 400);
+  } else {
+    // PC用のサイズ設定
+    canvasWidth = min(windowWidth - 40, 800);
+    canvasHeight = min(windowHeight - 300, 600);
+  }
+  
   resizeCanvas(canvasWidth, canvasHeight);
   
   // テンプレートバッファが存在する場合のみリサイズ
