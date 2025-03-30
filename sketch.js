@@ -470,25 +470,26 @@ function resetCanvas() {
   updateDisplayChar();
 }
 
-// createTemplateImage関数を修正
+// テンプレート画像の作成を修正（数字向けに調整）
 function createTemplateImage() {
   templateBuffer.clear();
   templateBuffer.background(255, 0); // 透明な背景
   
-  // 数字カテゴリの場合は専用のテンプレート生成関数を使用
+  // 数字カテゴリの場合は専用関数を呼び出す
   if (state.currentCategory === 'numbers') {
     createSimplifiedNumberTemplate();
     state.templateCreated = true;
     return;
   }
   
-  // 他のカテゴリ（ひらがな・カタカナ）は従来通り
+  // Y位置を調整（キャンバスの30%の位置に配置して文字位置と合わせる）
   let yPosition = isMobileDevice() ? templateBuffer.height * 0.3 : templateBuffer.height * 0.45;
   
+  // すべてのカテゴリで同じ処理
   templateBuffer.push();
   templateBuffer.textSize(min(width, height) * 0.7);
   templateBuffer.textAlign(CENTER, CENTER);
-  templateBuffer.fill(0, 0, 0, 255);
+  templateBuffer.fill(0, 0, 0, 255); // 黒でクリアに
   templateBuffer.text(state.currentChar, templateBuffer.width/2, yPosition);
   templateBuffer.pop();
   
@@ -821,7 +822,212 @@ function calculateCoverage() {
   return coverageScore;
 }
 
-// 子供向けに改善した判定関数を修正
+// // 子供向けに改善した判定関数を修正
+// function calculateFriendlyScore() {
+//   // 従来の指標
+//   let accuracyScore = checkAccuracy();    // はみ出さずに書けたか
+//   let coverageScore = calculateCoverage(); // 文字全体をなぞれたか
+//   let keyPointsScore = checkKeyPointsCoverage(); // 重要ポイントをなぞれたか
+  
+//   console.log(`判定前の生スコア - 精度:${accuracyScore.toFixed(1)}, カバー:${coverageScore.toFixed(1)}, キーポイント:${keyPointsScore.toFixed(1)}`);
+  
+//   // モバイル環境では判定を適切に調整
+//   if (isMobileDevice()) {
+//     // モバイルでは判定を大きく緩和
+//     accuracyScore = Math.min(100, accuracyScore * 1.5);  // 50%増加
+//     coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
+//     keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
+//   }
+
+//   // 単純な文字や数字に対する補正を強化
+//   if (state.currentCategory === 'numbers' || 
+//     ['一', '二', '三', 'イ', 'ー'].includes(state.currentChar)) {
+//   // 単純な形状の文字は特に評価を緩くする
+//   keyPointsScore = Math.min(100, keyPointsScore * 1.5);
+//   coverageScore = Math.min(100, coverageScore * 1.3);
+//   }
+
+  
+//   // ひらがな・カタカナも適切に
+//   let finalScore = Math.floor(
+//     accuracyScore * 0.25 + 
+//     coverageScore * 0.3 + 
+//     keyPointsScore * 0.45
+//   );
+  
+//   // モバイル環境でも過剰な加点はしない
+//   if (isMobileDevice()) {
+//     finalScore = Math.min(100, finalScore + 15); // 加点を10→15に増加
+//   }
+  
+//   console.log(`最終スコア: ${finalScore}`);
+//   return finalScore;
+// }
+// 改善された採点ロジック
+function calculateImprovedScore() {
+  if (!state.templateCreated) {
+    createTemplateImage();
+  }
+  
+  // 1. ユーザーが描いた部分を取得
+  const userDrawn = createUserDrawnBuffer();
+  
+  // 2. 重要度マップを作成（文字の重要な部分ほど高い値）
+  const importanceMap = createImportanceMap();
+  
+  // 3. スコア計算
+  let totalScore = 0;
+  let possibleScore = 0;
+  
+  // キャンバス全体をスキャン
+  importanceMap.loadPixels();
+  userDrawn.loadPixels();
+  
+  // 重要度マップの各ピクセルをチェック
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = 4 * (y * width + x);
+      
+      // 重要度（0-255）を取得
+      const importance = importanceMap.pixels[idx + 0]; // R値を重要度として使用
+      
+      if (importance > 0) {
+        possibleScore += importance;
+        
+        // ユーザーがこのピクセルを描いたか確認
+        if (userDrawn.pixels[idx + 3] > 0) {
+          totalScore += importance;
+        }
+      }
+    }
+  }
+  
+  // 正規化して0-100のスコアに変換
+  let finalScore = Math.round((totalScore / possibleScore) * 100);
+  
+  // 文字種別によるボーナス
+  if (state.currentCategory === 'numbers') {
+    // 数字は特にシンプルなのでボーナス
+    finalScore = Math.min(100, Math.round(finalScore * 1.25));
+  }
+  
+  // デバイスタイプによるボーナス
+  if (isMobileDevice()) {
+    // モバイルは操作が難しいのでボーナス
+    finalScore = Math.min(100, Math.round(finalScore * 1.2));
+  }
+  
+  // とても簡単な文字に特別ボーナス
+  const simpleChars = ['一', 'ー', 'イ', '1', 'l', '|'];
+  if (simpleChars.includes(state.currentChar)) {
+    finalScore = Math.min(100, Math.round(finalScore * 1.3));
+  }
+  
+  // 子供向けにスコアを調整（低すぎる点数にならないよう調整）
+  finalScore = Math.max(20, finalScore);
+  
+  console.log(`新採点システム - スコア: ${finalScore}`);
+  return finalScore;
+}
+
+// ユーザーの描画をバッファに変換
+function createUserDrawnBuffer() {
+  const buffer = createGraphics(width, height);
+  buffer.background(255, 0); // 透明背景
+  
+  // ユーザーの描画を再現
+  for (let userStroke of state.userStrokes) {
+    if (userStroke.length > 0) {
+      buffer.push();
+      buffer.stroke(0); // 黒で統一
+      buffer.strokeWeight(state.strokeWidth * 1.2); // 少し太めに
+      buffer.noFill();
+      buffer.beginShape();
+      for (let point of userStroke) {
+        buffer.vertex(point.x, point.y);
+      }
+      buffer.endShape();
+      buffer.pop();
+    }
+  }
+  
+  return buffer;
+}
+
+// 文字の重要度マップを作成
+function createImportanceMap() {
+  const buffer = createGraphics(width, height);
+  buffer.background(0, 0); // 透明な黒背景
+  
+  // Y位置の調整（メイン表示と同じ）
+  let yPosition = isMobileDevice() ? buffer.height * 0.3 : buffer.height * 0.45;
+  
+  // 数字の場合は専用処理
+  if (state.currentCategory === 'numbers') {
+    // 数字用の重要度マップ
+    createNumberImportanceMap(buffer, yPosition);
+  } else {
+    // ひらがな・カタカナ用の処理
+    buffer.push();
+    buffer.fill(100); // グレーで基本の重要度を表現
+    buffer.stroke(180);
+    buffer.strokeWeight(10);
+    buffer.textSize(min(width, height) * 0.7);
+    buffer.textAlign(CENTER, CENTER);
+    buffer.text(state.currentChar, buffer.width/2, yPosition);
+    
+    // 文字の輪郭部分をより重要に
+    buffer.noFill();
+    buffer.stroke(255); // 白（最重要）
+    buffer.strokeWeight(4);
+    buffer.text(state.currentChar, buffer.width/2, yPosition);
+    buffer.pop();
+  }
+  
+  return buffer;
+}
+
+// 数字用の重要度マップ
+function createNumberImportanceMap(buffer, yPosition) {
+  const centerX = buffer.width / 2;
+  const centerY = yPosition;
+  const size = min(width, height) * 0.6;
+  
+  buffer.push();
+  
+  switch(state.currentChar) {
+    case '1':
+      // 縦線を強調
+      buffer.stroke(255);
+      buffer.strokeWeight(15);
+      buffer.line(centerX, centerY - size * 0.4, centerX, centerY + size * 0.4);
+      break;
+      
+    case '0':
+      // 丸を強調
+      buffer.stroke(255);
+      buffer.strokeWeight(15);
+      buffer.noFill();
+      buffer.ellipse(centerX, centerY, size * 0.6, size * 0.8);
+      break;
+      
+    // 他の数字も同様に特殊処理
+      
+    default:
+      // その他の数字はテキストベース
+      buffer.fill(150);
+      buffer.stroke(255);
+      buffer.strokeWeight(8);
+      buffer.textSize(min(width, height) * 0.7);
+      buffer.textAlign(CENTER, CENTER);
+      buffer.text(state.currentChar, centerX, centerY);
+  }
+  
+  buffer.pop();
+  return buffer;
+}
+
+// 子供向けに改善した判定関数
 function calculateFriendlyScore() {
   // 従来の指標
   let accuracyScore = checkAccuracy();    // はみ出さずに書けたか
@@ -830,24 +1036,77 @@ function calculateFriendlyScore() {
   
   console.log(`判定前の生スコア - 精度:${accuracyScore.toFixed(1)}, カバー:${coverageScore.toFixed(1)}, キーポイント:${keyPointsScore.toFixed(1)}`);
   
-  // モバイル環境では判定を適切に調整
-  if (isMobileDevice()) {
-    // モバイルでは判定を大きく緩和
-    accuracyScore = Math.min(100, accuracyScore * 1.5);  // 50%増加
-    coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
+  // ストロークがほとんどない場合は低スコアにする
+  if (state.userStrokes.length < 2) {
+    const strokePoints = state.userStrokes.reduce((total, stroke) => total + stroke.length, 0);
+    if (strokePoints < 10) {
+      console.log("ストロークが少なすぎます: " + strokePoints);
+      return 10; // ほとんど書いていない場合は低スコア
+    }
   }
-
-  // 単純な文字や数字に対する補正を強化
-  if (state.currentCategory === 'numbers' || 
-    ['一', '二', '三', 'イ', 'ー'].includes(state.currentChar)) {
-  // 単純な形状の文字は特に評価を緩くする
-  keyPointsScore = Math.min(100, keyPointsScore * 1.5);
-  coverageScore = Math.min(100, coverageScore * 1.3);
-  }
-
   
-  // ひらがな・カタカナも適切に
+  // 数字の場合はスコアを適度に調整
+  if (state.currentCategory === 'numbers') {
+    // 数字は適度なボーナスを付与
+    accuracyScore = Math.min(100, accuracyScore * 1.3);  // 30%増加
+    coverageScore = Math.min(100, coverageScore * 1.4);  // 40%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
+    
+    // 特に「1」と「0」は特別ボーナス
+    if (state.currentChar === '1' || state.currentChar === '0') {
+      keyPointsScore = Math.min(100, keyPointsScore * 1.2); // さらに20%増加
+    }
+    
+    // 配分も調整
+    let finalScore = Math.floor(
+      accuracyScore * 0.25 + 
+      coverageScore * 0.35 + 
+      keyPointsScore * 0.4
+    );
+    
+    // 最低スコアを設定（低すぎないが高すぎない値に）
+    finalScore = Math.max(20, Math.min(90, finalScore));
+    
+    console.log(`数字の最終スコア: ${finalScore}`);
+    return finalScore;
+  } else if (state.currentCategory === 'hiragana') {
+    // ひらがなは特に難しいので大幅なボーナス
+    accuracyScore = Math.min(100, accuracyScore * 1.3);  // 30%増加
+    coverageScore = Math.min(100, coverageScore * 1.6);  // 60%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.7); // 70%増加
+    
+    // 配分も調整（キーポイントの比重を下げる）
+    let finalScore = Math.floor(
+      accuracyScore * 0.3 + 
+      coverageScore * 0.5 + 
+      keyPointsScore * 0.2
+    );
+    
+    // 最低点を設定
+    finalScore = Math.max(20, finalScore);
+    
+    console.log(`ひらがなの最終スコア: ${finalScore}`);
+    return finalScore;
+  } else if (state.currentCategory === 'katakana') {
+    // カタカナも難しいのでボーナス
+    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 20%増加
+    coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.6); // 60%増加
+    
+    let finalScore = Math.floor(
+      accuracyScore * 0.3 + 
+      coverageScore * 0.45 + 
+      keyPointsScore * 0.25
+    );
+    
+    // 最低点を設定
+    finalScore = Math.max(20, finalScore);
+    
+    console.log(`カタカナの最終スコア: ${finalScore}`);
+    return finalScore;
+  }
+  
+  // どのカテゴリにも当てはまらない場合（念のため）
   let finalScore = Math.floor(
     accuracyScore * 0.25 + 
     coverageScore * 0.3 + 
@@ -856,10 +1115,10 @@ function calculateFriendlyScore() {
   
   // モバイル環境でも過剰な加点はしない
   if (isMobileDevice()) {
-    finalScore = Math.min(100, finalScore + 15); // 加点を10→15に増加
+    finalScore = Math.min(100, finalScore + 15); // 加点を15に
   }
   
-  console.log(`最終スコア: ${finalScore}`);
+  console.log(`その他カテゴリの最終スコア: ${finalScore}`);
   return finalScore;
 }
 
@@ -870,16 +1129,16 @@ function showFriendlyFeedback() {
   // 評価のレベルに応じた設定
   let emoji, message, color;
   
-  // 評価を適切に分ける
+  // 評価を適切に分ける - 基準を緩和
   const actualScore = state.accuracy;
   
   // 実際の判定に基づいて評価を決定
-  if (actualScore >= 60) {
+  if (actualScore >= 50) {  // 60から50に下げる
     emoji = '⭐⭐⭐';
     message = 'すごい！';
     color = '#4CAF50'; // 緑
     playSuccessSound();
-  } else if (actualScore >= 30) {
+  } else if (actualScore >= 25) {  // 30から25に下げる
     emoji = '⭐⭐';
     message = 'がんばったね！';
     color = '#FFC107'; // 黄色
