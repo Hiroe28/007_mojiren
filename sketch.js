@@ -453,8 +453,8 @@ function createTemplateImage() {
   templateBuffer.clear();
   templateBuffer.background(255, 0); // 透明な背景
   
-  // Y位置を調整（キャンバスの40%の位置に配置して文字位置と合わせる）
-  let yPosition = isMobileDevice() ? templateBuffer.height * 0.4 : templateBuffer.height * 0.45;
+  // Y位置を調整（キャンバスの30%の位置に配置して文字位置と合わせる）
+  let yPosition = isMobileDevice() ? templateBuffer.height * 0.3 : templateBuffer.height * 0.45;
   
   // すべてのカテゴリで同じ処理
   templateBuffer.push();
@@ -469,9 +469,9 @@ function createTemplateImage() {
 
 // 数字用の簡略化されたテンプレートを作成
 function createSimplifiedNumberTemplate() {
-  // Y位置を調整（キャンバスの40%の位置に配置して文字位置と合わせる）
+  // Y位置を調整（キャンバスの30%の位置に配置して文字位置と合わせる）
   const centerX = width / 2;
-  const centerY = isMobileDevice() ? height * 0.4 : height * 0.45;
+  const centerY = isMobileDevice() ? height * 0.3 : height * 0.45;
   const size = min(width, height) * 0.6; // サイズを少し小さく
   
   templateBuffer.push();
@@ -802,17 +802,12 @@ function calculateFriendlyScore() {
   
   console.log(`判定前の生スコア - 精度:${accuracyScore.toFixed(1)}, カバー:${coverageScore.toFixed(1)}, キーポイント:${keyPointsScore.toFixed(1)}`);
   
-  // モバイル環境では過剰な判定強化
+  // モバイル環境では判定を適切に調整（過剰な加点はしない）
   if (isMobileDevice()) {
-    // モバイルでは常に合格点になるよう調整
-    accuracyScore = Math.max(accuracyScore, 70);  // 最低70点保証
-    coverageScore = Math.max(coverageScore, 70);  // 最低70点保証
-    keyPointsScore = Math.max(keyPointsScore, 70); // 最低70点保証
-    
-    // さらにボーナス加算
-    accuracyScore = Math.min(100, accuracyScore * 1.2);
-    coverageScore = Math.min(100, coverageScore * 1.2);
-    keyPointsScore = Math.min(100, keyPointsScore * 1.2);
+    // モバイルでは判定を緩和するがランク分けを保持
+    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 20%増加
+    coverageScore = Math.min(100, coverageScore * 1.2);  // 20%増加
+    keyPointsScore = Math.min(100, keyPointsScore * 1.2); // 20%増加
   }
   
   // カテゴリ別の判定調整
@@ -820,31 +815,24 @@ function calculateFriendlyScore() {
     // 数字は特に簡単に書けるように
     keyPointsScore = Math.min(100, keyPointsScore * 1.2);
     
-    // 数字の場合はカバレッジ要求を下げる
-    if (keyPointsScore >= 50) {
-      coverageScore = Math.max(coverageScore, 70);
-    }
-    
     // 配分も調整（キーポイントの比重を上げる）
-    return Math.max(70, Math.floor(
+    return Math.floor(
       accuracyScore * 0.2 + 
       coverageScore * 0.3 + 
       keyPointsScore * 0.5
-    ));
+    );
   }
   
-  // ひらがな・カタカナも簡単に
+  // ひらがな・カタカナも適切に
   let finalScore = Math.floor(
     accuracyScore * 0.25 + 
     coverageScore * 0.3 + 
     keyPointsScore * 0.45
   );
   
-  // モバイル環境では大幅加点
+  // モバイル環境でも過剰な加点はしない
   if (isMobileDevice()) {
-    finalScore = Math.min(100, finalScore + 20);
-    // モバイルの場合は最低スコアを設定（常に⭐⭐以上になるようにする）
-    finalScore = Math.max(finalScore, 80);
+    finalScore = Math.min(100, finalScore + 10); // 加点を10に制限
   }
   
   console.log(`最終スコア: ${finalScore}`);
@@ -856,19 +844,19 @@ function showFriendlyFeedback() {
   if (!state.showAccuracy) return;
   
   push();
-  // 評価のレベルに応じた設定（モバイルでは常に良い評価に）
+  // 評価のレベルに応じた設定
   let emoji, message, color;
   
-  // モバイルでは最低でも⭐⭐にする
-  const effectiveScore = isMobileDevice() ? Math.max(state.accuracy, 60) : state.accuracy;
+  // 評価を適切に分ける（モバイルでも適切な評価を返すように）
+  const actualScore = state.accuracy;
   
-  // 判定閾値を下げる（モバイルで常に⭐になる問題を解決）
-  if (effectiveScore >= 60) { // 閾値を60に維持
+  // 実際の判定に基づいて評価を決定（閾値はそのまま）
+  if (actualScore >= 60) {
     emoji = '⭐⭐⭐';
     message = 'すごい！';
     color = '#4CAF50'; // 緑
     playSuccessSound();
-  } else if (effectiveScore >= 30) { // 閾値を30に維持
+  } else if (actualScore >= 30) {
     emoji = '⭐⭐';
     message = 'がんばったね！';
     color = '#FFC107'; // 黄色
@@ -880,6 +868,9 @@ function showFriendlyFeedback() {
     playTryAgainSound();
   }
   
+  // スコアとフィードバックをログに出力（デバッグ用）
+  console.log(`判定結果: ${actualScore}点, 評価: ${message}`);
+  
   // フィードバック表示 - 位置を明確に指定
   textAlign(CENTER, TOP);
   
@@ -887,22 +878,23 @@ function showFriendlyFeedback() {
   if (state.debugMode) {
     textSize(12);
     fill(100);
-    text(`判定結果: ${state.accuracy}点`, width/2, 5);
+    text(`判定結果: ${actualScore}点`, width/2, 5);
   }
   
   // モバイルデバイスでの表示位置調整
   let yPosEmoji, yPosMessage;
   
   if (isMobileDevice()) {
-    // モバイル用表示位置 - もっと下に表示
-    yPosEmoji = height * 0.75;  // 0.65→0.75へ移動
-    yPosMessage = height * 0.85; // 0.75→0.85へ移動
+    // モバイル用表示位置 - 文字より下の空きスペースに表示
+    yPosEmoji = height * 0.55;  // 0.75→0.55へ移動
+    yPosMessage = height * 0.65; // 0.85→0.65へ移動
     
-    textSize(36);
+    // サイズを大きく
+    textSize(48);
     fill(color);
     text(emoji, width/2, yPosEmoji);
     
-    textSize(24);
+    textSize(32);
     text(message, width/2, yPosMessage);
   } else {
     // PC用表示位置 - 文字の下に表示
@@ -933,8 +925,8 @@ function updateDisplayChar() {
   textFont('Klee One'); // Kleeフォントを使用
   fill(220, 220, 220); // 透明度なしの薄いグレー
   
-  // Y位置を少し上に調整（キャンバスの40%の位置に配置）
-  let yPosition = isMobileDevice() ? height * 0.4 : height * 0.45;
+  // Y位置をさらに上に調整（キャンバスの30%の位置に配置）
+  let yPosition = isMobileDevice() ? height * 0.3 : height * 0.45;
   text(state.currentChar, width/2, yPosition);
   pop();
   
@@ -984,6 +976,15 @@ function createCheckButton() {
       
       // 結果表示の更新
       updateDisplayChar();
+      
+      // 結果を表示するためにスクロールを制御
+      if (isMobileDevice()) {
+        // キャンバスがある位置に自動スクロール
+        const canvasElement = document.getElementById('sketch-holder');
+        if (canvasElement) {
+          canvasElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
       
       // イベントの伝播を止めない (preventDefault不使用)
     });
