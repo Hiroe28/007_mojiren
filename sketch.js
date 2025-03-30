@@ -1027,7 +1027,7 @@ function createNumberImportanceMap(buffer, yPosition) {
   return buffer;
 }
 
-// 子供向けに改善した判定関数
+// モバイルに特化した判定関数
 function calculateFriendlyScore() {
   // 従来の指標
   let accuracyScore = checkAccuracy();    // はみ出さずに書けたか
@@ -1037,88 +1037,98 @@ function calculateFriendlyScore() {
   console.log(`判定前の生スコア - 精度:${accuracyScore.toFixed(1)}, カバー:${coverageScore.toFixed(1)}, キーポイント:${keyPointsScore.toFixed(1)}`);
   
   // ストロークがほとんどない場合は低スコアにする
-  if (state.userStrokes.length < 2) {
-    const strokePoints = state.userStrokes.reduce((total, stroke) => total + stroke.length, 0);
-    if (strokePoints < 10) {
-      console.log("ストロークが少なすぎます: " + strokePoints);
-      return 10; // ほとんど書いていない場合は低スコア
+  if (state.userStrokes.length === 0 || (state.userStrokes.length === 1 && state.userStrokes[0].length < 5)) {
+    console.log("ストロークがほぼありません");
+    return 10; // ほとんど書いていない場合は低スコア
+  }
+  
+  // --- モバイルデバイス特別処理 ---
+  const isMobile = isMobileDevice();
+  if (isMobile) {
+    console.log("モバイルデバイス用の補正を適用");
+    // モバイルでは大幅なボーナスを適用
+    accuracyScore = Math.min(100, accuracyScore * 2.0);  // 100%増加（2倍）
+    coverageScore = Math.min(100, coverageScore * 2.0);  // 100%増加（2倍）
+    keyPointsScore = Math.min(100, keyPointsScore * 2.5); // 150%増加（2.5倍）
+  }
+  
+  // --- カテゴリ別処理 ---
+  if (state.currentCategory === 'numbers') {
+    // 数字カテゴリ
+    if (isMobile) {
+      // モバイルの数字はさらにボーナス
+      accuracyScore = Math.min(100, accuracyScore * 1.2);  // さらに20%増加
+      coverageScore = Math.min(100, coverageScore * 1.3);  // さらに30%増加
+    } else {
+      // PC用
+      accuracyScore = Math.min(100, accuracyScore * 1.3);
+      coverageScore = Math.min(100, coverageScore * 1.4);
+      keyPointsScore = Math.min(100, keyPointsScore * 1.5);
+    }
+    
+    // 特に「1」と「0」など単純な文字は特別ボーナス
+    if (['0', '1', '7'].includes(state.currentChar)) {
+      keyPointsScore = Math.min(100, keyPointsScore * 1.3);
+    }
+    
+  } else if (state.currentCategory === 'hiragana') {
+    // ひらがなカテゴリ
+    if (!isMobile) {
+      // PCの場合のみ（モバイルは上ですでに大きなボーナス適用済み）
+      accuracyScore = Math.min(100, accuracyScore * 1.3);
+      coverageScore = Math.min(100, coverageScore * 1.6);
+      keyPointsScore = Math.min(100, keyPointsScore * 1.7);
+    }
+    
+    // 単純なひらがなは特別ボーナス
+    if (['い', 'こ', 'て', 'へ', 'ー'].includes(state.currentChar)) {
+      keyPointsScore = Math.min(100, keyPointsScore * 1.2);
+    }
+    
+  } else if (state.currentCategory === 'katakana') {
+    // カタカナカテゴリ
+    if (!isMobile) {
+      // PCの場合のみ
+      accuracyScore = Math.min(100, accuracyScore * 1.2);
+      coverageScore = Math.min(100, coverageScore * 1.5);
+      keyPointsScore = Math.min(100, keyPointsScore * 1.6);
+    }
+    
+    // 単純なカタカナは特別ボーナス
+    if (['イ', 'ニ', 'ハ', 'ヘ', 'ー'].includes(state.currentChar)) {
+      keyPointsScore = Math.min(100, keyPointsScore * 1.2);
     }
   }
   
-  // 数字の場合はスコアを適度に調整
-  if (state.currentCategory === 'numbers') {
-    // 数字は適度なボーナスを付与
-    accuracyScore = Math.min(100, accuracyScore * 1.3);  // 30%増加
-    coverageScore = Math.min(100, coverageScore * 1.4);  // 40%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.5); // 50%増加
+  // --- 最終スコア計算 ---
+  let finalScore;
+  
+  if (isMobile) {
+    // モバイル用の重み調整
+    finalScore = Math.floor(
+      accuracyScore * 0.2 + 
+      coverageScore * 0.4 + 
+      keyPointsScore * 0.4
+    );
     
-    // 特に「1」と「0」は特別ボーナス
-    if (state.currentChar === '1' || state.currentChar === '0') {
-      keyPointsScore = Math.min(100, keyPointsScore * 1.2); // さらに20%増加
-    }
+    // モバイルでの最低点を高めに設定
+    finalScore = Math.max(40, finalScore);
     
-    // 配分も調整
-    let finalScore = Math.floor(
+    // 極端に高すぎないように
+    finalScore = Math.min(95, finalScore);
+  } else {
+    // PC用の重み調整
+    finalScore = Math.floor(
       accuracyScore * 0.25 + 
       coverageScore * 0.35 + 
       keyPointsScore * 0.4
     );
     
-    // 最低スコアを設定（低すぎないが高すぎない値に）
-    finalScore = Math.max(20, Math.min(90, finalScore));
-    
-    console.log(`数字の最終スコア: ${finalScore}`);
-    return finalScore;
-  } else if (state.currentCategory === 'hiragana') {
-    // ひらがなは特に難しいので大幅なボーナス
-    accuracyScore = Math.min(100, accuracyScore * 1.3);  // 30%増加
-    coverageScore = Math.min(100, coverageScore * 1.6);  // 60%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.7); // 70%増加
-    
-    // 配分も調整（キーポイントの比重を下げる）
-    let finalScore = Math.floor(
-      accuracyScore * 0.3 + 
-      coverageScore * 0.5 + 
-      keyPointsScore * 0.2
-    );
-    
-    // 最低点を設定
+    // PCでの最低点
     finalScore = Math.max(20, finalScore);
-    
-    console.log(`ひらがなの最終スコア: ${finalScore}`);
-    return finalScore;
-  } else if (state.currentCategory === 'katakana') {
-    // カタカナも難しいのでボーナス
-    accuracyScore = Math.min(100, accuracyScore * 1.2);  // 20%増加
-    coverageScore = Math.min(100, coverageScore * 1.5);  // 50%増加
-    keyPointsScore = Math.min(100, keyPointsScore * 1.6); // 60%増加
-    
-    let finalScore = Math.floor(
-      accuracyScore * 0.3 + 
-      coverageScore * 0.45 + 
-      keyPointsScore * 0.25
-    );
-    
-    // 最低点を設定
-    finalScore = Math.max(20, finalScore);
-    
-    console.log(`カタカナの最終スコア: ${finalScore}`);
-    return finalScore;
   }
   
-  // どのカテゴリにも当てはまらない場合（念のため）
-  let finalScore = Math.floor(
-    accuracyScore * 0.25 + 
-    coverageScore * 0.3 + 
-    keyPointsScore * 0.45
-  );
-  
-  // モバイル環境でも過剰な加点はしない
-  if (isMobileDevice()) {
-    finalScore = Math.min(100, finalScore + 15); // 加点を15に
-  }
-  
-  console.log(`その他カテゴリの最終スコア: ${finalScore}`);
+  console.log(`デバイス: ${isMobile ? 'モバイル' : 'PC'}, 最終スコア: ${finalScore}`);
   return finalScore;
 }
 
